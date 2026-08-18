@@ -576,7 +576,11 @@
           <option value="1.5">1.5x</option>
           <option value="2">2.0x</option>
         </select>
-        <label id="loopChk"><input type="checkbox" id="loopBox"> 循环</label>
+        <select id="playMode" class="rateSel" title="播完之后干嘛">
+          <option value="pause">播完暂停</option>
+          <option value="next">播完下一曲</option>
+          <option value="loop">单曲循环</option>
+        </select>
         <input id="vol" type="range" min="0" max="100" value="90" title="音量">
       </div>
     </div>
@@ -669,7 +673,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.4.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -819,7 +823,7 @@ function snapshot() {
   const tracks = {};
   for (const id in state.tracks) {
     const t = state.tracks[id];
-    tracks[id] = { id: t.id, file: t.file, kind: t.kind, fmt: t.fmt, size: t.size, duration: t.duration };
+    tracks[id] = { id: t.id, file: t.file, kind: t.kind, kindSource: t.kindSource || null, fmt: t.fmt, size: t.size, duration: t.duration };
   }
   return { groups: state.groups, tracks, records: state.records, order: state.order, current: state.current };
 }
@@ -1020,7 +1024,7 @@ async function sniffFormat(file) {
   return null;
 }
 
-async function addDirectory(fileList, kind) {
+async function addDirectory(fileList, dirKind) {
   const audioExts = /\.(mp3|m4a|wav|ogg|flac|aac)$/i;
   let added = 0, dup = 0;
   for (const f of fileList) {
@@ -1036,17 +1040,37 @@ async function addDirectory(fileList, kind) {
     }
     let fmt = audioExts.exec(f.name)[1].toLowerCase();
     try { const s = await sniffFormat(f); if (s) fmt = s; } catch (e) {}
-    state.tracks[base] = { id: base, file: f.name, kind, fmt, size: f.size, _file: f, url: null };
+    const t = {
+      id: base, file: f.name,
+      kind: dirKind || "music",      // 目录类型只当兜底提示；真正分类等时长数据自动判
+      kindSource: null,
+      fmt, size: f.size, _file: f, url: null,
+    };
+    state.tracks[base] = t;
     added++;
   }
   rebuildOrder(); saveLocal();
   renderAll();
-  log("info", "添加目录", `kind=${kind} 新增 ${added} 首，重复跳过 ${dup} 首`);
-  toast(`新增 ${added} 首${dup ? `（重复 ${dup} 跳过）` : ""}`, false, kind === "sfx" ? "hmm.png" : "happy.png");
+  log("info", "添加目录", `kind=${dirKind} 新增 ${added} 首，重复跳过 ${dup} 首`);
+  toast(`新增 ${added} 首${dup ? `（重复 ${dup} 跳过）` : ""}`, false, dirKind === "sfx" ? "hmm.png" : "happy.png");
   if (added && !state.current) playFirstVisible();
 }
 
 function rebuildOrder() { state.order = Object.keys(state.tracks).sort(); }
+
+/* ── 音乐/音效自动预分类（一次性，人工改过永不覆盖）─────────────
+   标准：< 30s 归音效（典型音效 ≤10s，环境音 10~30s 也偏音效用场）
+         ≥ 30s 归音乐（典型 1 分钟以上）
+   kindSource: null=还没判过（等时长数据） / auto=自动判过 / manual=人工改过 */
+function autoKindOf(duration) { return duration != null && duration >= 30 ? "music" : "sfx"; }
+
+function applyAutoKind(track, duration) {
+  if (track.kindSource === "manual" || track.kindSource === "auto") return false; // 只判一次
+  if (duration == null || !isFinite(duration)) return false;
+  track.kind = autoKindOf(duration);
+  track.kindSource = "auto";
+  return true;
+}
 
 function pickDirectory(kind) {
   const inp = document.createElement("input");
@@ -1108,15 +1132,29 @@ audio.addEventListener("loadedmetadata", () => {
   const t = state.tracks[state.current];
   if (t && audio.duration && isFinite(audio.duration)) {
     t.duration = audio.duration;
+    // 浏览器直开模式：首次拿到时长时自动判一次类型
+    if (applyAutoKind(t, audio.duration) && state.records[state.current]) {
+      state.records[state.current].kind = t.kind;
+    }
     if (state.records[state.current]) state.records[state.current].duration = audio.duration;
-    updateTimeLabels(); renderNowName(); renderList();
+    updateTimeLabels(); renderNowName(); renderList(); renderTagPanel();
     scheduleSave("时长解析");
   }
 });
 
+// 播放模式：pause 播完暂停（默认）/ next 播完下一曲 / loop 单曲循环
+const playModeSel = $("playMode");
+playModeSel.value = localStorage.getItem("laoyu_playmode") || "pause";
+playModeSel.addEventListener("change", () => {
+  localStorage.setItem("laoyu_playmode", playModeSel.value);
+  toast(playModeSel.value === "next" ? "播完自动下一曲" : playModeSel.value === "loop" ? "单曲循环" : "播完暂停", false, "hmm.png");
+});
+
 audio.addEventListener("ended", () => {
-  if ($("loopBox").checked) { audio.currentTime = 0; audio.play(); return; }
-  nextTrack(true);
+  const mode = playModeSel.value;
+  if (mode === "loop") { audio.currentTime = 0; audio.play(); return; }
+  if (mode === "next") nextTrack(true);
+  // pause：什么都不做，自然停住
 });
 
 function updateTimeLabels() {
@@ -1378,12 +1416,13 @@ function toggleTag(group, tag, onlyOff) {
   scheduleSave("打标");
 }
 
-// 切换当前曲类型
+// 切换当前曲类型（人工修正，之后自动分类永不再动它）
 $("btnKind").addEventListener("click", () => {
   const id = state.current;
   if (!id) return;
   const t = state.tracks[id];
   t.kind = t.kind === "sfx" ? "music" : "sfx";
+  t.kindSource = "manual";
   if (state.records[id]) {
     state.records[id].kind = t.kind;
     state.records[id].updated_at = nowISO();
@@ -1391,9 +1430,9 @@ $("btnKind").addEventListener("click", () => {
   } else {
     saveLocal();
   }
-  log("info", "改类型", `${t.file} → ${t.kind}`);
+  log("info", "改类型", `${t.file} → ${t.kind}（人工，锁定）`);
   renderTagPanel(); renderList(); renderNowName();
-  toast(t.kind === "sfx" ? "改成音效了 🔊" : "改成音乐了 🎵", false, "hmm.png");
+  toast(t.kind === "sfx" ? "改成音效了 🔊（已锁定，自动分类不再动它）" : "改成音乐了 🎵（已锁定，自动分类不再动它）", false, "hmm.png");
 });
 
 let noteSaveTimer = null;
@@ -1707,29 +1746,37 @@ async function syncFromServer(first) {
   try {
     const r = await fetch(base + "/manifest.json", { cache: "no-store" });
     const data = await r.json();
-    let added = 0;
+    let added = 0, kindFixed = 0;
     for (const f of data.files || []) {
       const base2 = f.name.replace(/\.[^.]+$/, "");
       const url = f.url || base + "/music/" + encodeURIComponent(f.name);
       if (state.tracks[base2]) {
         const t = state.tracks[base2];
         if (!t._file && !t.url) { t.url = url; if (f.fmt) t.fmt = f.fmt; }
+        // 旧数据升级：还没判过类型且这次有时长 → 自动判一次
+        if (applyAutoKind(t, f.duration)) { kindFixed++; if (state.records[base2]) state.records[base2].kind = t.kind; }
         continue;
       }
-      state.tracks[base2] = {
-        id: base2, file: f.name, kind: f.kind || "music",
-        fmt: f.fmt || "", size: f.size || 0, _file: null, url,
+      const nt = {
+        id: base2, file: f.name,
+        kind: f.kind || "music", kindSource: null,
+        fmt: f.fmt || "", size: f.size || 0, duration: f.duration || null,
+        _file: null, url,
       };
+      applyAutoKind(nt, f.duration); // 入库即判（一次）
+      state.tracks[base2] = nt;
       added++;
     }
     rebuildOrder(); saveLocal(); renderList(); renderProgress();
     if (first) {
-      log("info", "服务器模式", `载入 ${added} 首`);
-      toast(`服务器模式：载入 ${added} 首`, false, "wave.png");
+      log("info", "服务器模式", `载入 ${added} 首` + (kindFixed ? `，按时长自动分类 ${kindFixed} 首` : ""));
+      toast(`载入 ${added} 首${kindFixed ? `，自动分好 ${kindFixed} 首的类型` : ""}`, false, "wave.png");
       if (state.order.length && !state.current) playFirstVisible();
     } else if (added) {
       log("ok", "自动同步", `剪映缓存新增 ${added} 首，已入库`);
       toast(`剪映缓存有新增，自动加了 ${added} 首 🎉`, false, "cheer.png");
+    } else if (kindFixed) {
+      log("info", "自动同步", `按时长补判 ${kindFixed} 首的类型`);
     }
     return added;
   } catch (e) {

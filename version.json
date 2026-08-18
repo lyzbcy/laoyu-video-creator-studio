@@ -1,1 +1,1 @@
-{"version":"2.3.0","date":"2026-08-18","notes":["修复拖动进度条跳回 0 秒的问题（音频服务支持分段请求）","新增版本更新检测与一键更新","上线发布页"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
+{"version":"2.4.0","date":"2026-08-18","notes":["音乐/音效自动预分类：按 30 秒标准一次性自动分好，人工改过后永不再动","播放模式可设置：播完暂停（默认）/ 播完下一曲 / 单曲循环","服务器自动解析音频时长，进度条更准"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
