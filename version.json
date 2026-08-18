@@ -1,1 +1,1 @@
-{"version":"2.4.0","date":"2026-08-18","notes":["音乐/音效自动预分类：按 30 秒标准一次性自动分好，人工改过后永不再动","播放模式可设置：播完暂停（默认）/ 播完下一曲 / 单曲循环","服务器自动解析音频时长，进度条更准"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
+{"version":"2.4.1","date":"2026-08-18","notes":["修复命令行窗口中文乱码（统一 UTF-8 显示）","没装 Node.js 时给出友好引导而不是报错","工具已在运行时双击启动会自动帮你打开工具页"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}

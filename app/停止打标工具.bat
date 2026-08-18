@@ -1,14 +1,15 @@
 @echo off
-title ÀÌÓã´ò±ê¹¤¾ß - Í£Ö¹
+chcp 65001 >nul
+title æžé±¼æ‰“æ ‡å·¥å…· - åœæ­¢
 set PORT=8431
 set KILLED=
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%PORT% " ^| findstr LISTENING') do (
   taskkill /f /pid %%a >nul 2>&1 && set KILLED=1
 )
 if defined KILLED (
-  echo ÒÑÍ£Ö¹ÀÌÓã´ò±ê¹¤¾ßµÄ·þÎñÆ÷¡£
+  echo å·²åœæ­¢æžé±¼æ‰“æ ‡å·¥å…·çš„æœåŠ¡å™¨ã€‚
 ) else (
-  echo Ã»ÓÐÔÚÔËÐÐµÄ·þÎñÆ÷£¨¶Ë¿Ú %PORT% ÎÞÕ¼ÓÃ£©£¬±¾À´¾Í¹Ø×Å¡£
+  echo æ²¡æœ‰åœ¨è¿è¡Œçš„æœåŠ¡å™¨ï¼ˆç«¯å£ %PORT% æ— å ç”¨ï¼‰ï¼Œæœ¬æ¥å°±å…³ç€ã€‚
 )
-echo ´°¿Ú 3 Ãëºó×Ô¶¯¹Ø±Õ¡£
-timeout /t 3 >nul
+echo çª—å£ 3 ç§’åŽè‡ªåŠ¨å…³é—­ã€‚
+ping -n 4 127.0.0.1 >nul

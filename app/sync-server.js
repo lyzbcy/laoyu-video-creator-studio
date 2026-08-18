@@ -171,8 +171,10 @@ foreach ($u in @('${v.zip}', 'https://gh-proxy.com/${v.zip}')) {
 if (-not $ok) { throw 'zip download failed' }
 Expand-Archive -Path $zip -DestinationPath $tmp -Force
 $src = Get-ChildItem $tmp -Directory | Where-Object { $_.Name -like 'laoyu-tagger-*' } | Select-Object -First 1
-$app = Join-Path $src.FullName 'app'
-Get-ChildItem $app | Where-Object { $_.Name -ne 'bgm_library.jsonl' } | ForEach-Object {
+# 兼容两种仓库布局：旧版工具在 app/ 子目录，新版直接在仓库根
+$srcDir = Join-Path $src.FullName 'app'
+if (-not (Test-Path $srcDir)) { $srcDir = $src.FullName }
+Get-ChildItem $srcDir | Where-Object { $_.Name -ne 'bgm_library.jsonl' -and $_.Name -ne 'docs' } | ForEach-Object {
   Copy-Item $_.FullName -Destination $dst -Recurse -Force
 }
 Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
@@ -252,10 +254,10 @@ const server = http.createServer((req, res) => {  try {
 
 server.on("error", err => {
   if (err.code === "EADDRINUSE") {
-    console.log("端口 " + PORT + " 已被占用——工具多半已经在运行了。");
-    console.log("直接用浏览器里已打开的工具页面即可；实在找不到页面就重新双击本目录的 bat。");
-    console.log("这个窗口 4 秒后自动关闭。");
-    process.exit(2); // 退出码 2 = 已在运行，bat 据此给出对应提示
+    console.log("端口 " + PORT + " 已被占用——工具多半已经在运行了，这就帮你把工具页面打开。");
+    try { require("child_process").exec(`start "" "http://127.0.0.1:${PORT}/?server=http://127.0.0.1:${PORT}"`); } catch (e) {}
+    setTimeout(() => process.exit(2), 1200); // 退出码 2 = 已在运行，bat 据此提示
+    return;
   }
   console.error(err);
   process.exit(1);
