@@ -523,6 +523,7 @@
   <span class="spacer"></span>
   <button class="btn bouncy" id="btnAiTag" title="根据备注文本自动补标签（增量，不覆盖已有标签）">✨ 备注打标</button>
   <button class="btn primary bouncy" id="btnOrganize" title="把已打标文件按标准名复制到指定文件夹">📦 整理导出</button>
+  <button class="btn moss bouncy" id="btnSuperImport" title="导入「整理导出」产出的完整素材包（音乐/音效/Json 三件套）">🚀 超级导入</button>
   <button class="btn bouncy" id="btnLog">📒 日志</button>
   <button class="btn bouncy" id="btnImport">导入</button>
   <button class="btn bouncy" id="btnExport">导出</button>
@@ -651,6 +652,16 @@
   </div>
 </dialog>
 
+<dialog id="dlgSuperImport">
+  <h3><img src="assets/stickers/love.png" alt="">🚀 超级导入 — 发现标签数据</h3>
+  <p style="font-size:13.5px; line-height:1.9; margin-bottom:12px" id="siPreview"></p>
+  <div class="dlgBtns">
+    <button id="siCancel" class="btn bouncy">取消整个导入</button>
+    <button id="siIgnore" class="btn bouncy">只用当前库</button>
+    <button id="siMerge" class="btn primary bouncy">增量合并进来</button>
+  </div>
+</dialog>
+
 <dialog id="dlgOrganize">
   <h3><img src="assets/stickers/thanks.png" alt="">整理导出</h3>
   <p style="font-size:13px; line-height:1.9; margin-bottom:12px" id="orgPreview"></p>
@@ -673,7 +684,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.5.0";
+const APP_VERSION = "2.6.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -1528,10 +1539,11 @@ $("btnOrganize").addEventListener("click", async () => {
   const musicN = withFile.filter(r => (r.kind || "music") === "music").length;
   const sfxN = withFile.length - musicN;
   $("orgPreview").innerHTML =
-    `将把 <b>${withFile.length}</b> 首已打标音频按标准名复制到你选的文件夹：<br>` +
-    `🎵 音乐 <b>${musicN}</b> 首 → <code>音乐/</code> 子文件夹<br>🔊 音效 <b>${sfxN}</b> 首 → <code>音效/</code> 子文件夹<br>` +
+    `将导出完整素材包到你选的文件夹：<br>` +
+    `├ 🎵 音乐/ <b>${musicN}</b> 首　├ 🔊 音效/ <b>${sfxN}</b> 首<br>` +
+    `└ 📄 bgm_library.json（标签数据，ID 已同步为重命名后的新名，可「🚀 超级导入」还原）<br>` +
     `命名格式：<code>情绪标签-场景标签-剧情标签_哈希前8位.扩展名</code><br>` +
-    `<span style="color:var(--ink-faint);font-size:12px">只复制不改原文件；同名已存在会跳过。${labeled.length - withFile.length} 首需要重新添加目录后才能导出。</span>`;
+    `<span style="color:var(--ink-faint);font-size:12px">只复制不改原文件；同名已存在会跳过。${labeled.length - withFile.length ? `${labeled.length - withFile.length} 首需要重新添加目录后才能导出。` : ""}</span>`;
   const dlg = $("dlgOrganize");
   dlg.showModal();
   $("orgOk").onclick = async () => {
@@ -1540,29 +1552,175 @@ $("btnOrganize").addEventListener("click", async () => {
     try { outDir = await window.showDirectoryPicker({ mode: "readwrite" }); }
     catch (e) { return; }
     let ok = 0, skip = 0, fail = 0;
+    const exportRecords = []; // 随包导出的标签数据（ID=新名，source_id 溯源）
     const dirMusic = await outDir.getDirectoryHandle("音乐", { create: true });
     const dirSfx = await outDir.getDirectoryHandle("音效", { create: true });
     toast("整理中…", false, "cheer.png");
     for (const r of withFile) {
       const t = state.tracks[r.id];
-      const dir = (r.kind || "music") === "sfx" ? dirSfx : dirMusic;
+      const isSfx = (r.kind || "music") === "sfx";
+      const dir = isSfx ? dirSfx : dirMusic;
       const name = stdNameFor(r, t);
       try {
         const fh = await dir.getFileHandle(name, { create: true });
         const existing = await fh.getFile();
-        if (existing.size > 0) { skip++; continue; }
-        const w = await fh.createWritable();
-        const data = await trackArrayBuffer(t);
-        await w.write(data);
-        await w.close();
-        ok++;
+        if (existing.size > 0) { skip++; }
+        else {
+          const w = await fh.createWritable();
+          const data = await trackArrayBuffer(t);
+          await w.write(data);
+          await w.close();
+          ok++;
+        }
+        // 无论新写还是已存在，都把标签数据记进导出包（ID 对齐重命名后的新文件名）
+        exportRecords.push({
+          id: name.replace(/\.[^.]+$/, ""),
+          file: name,
+          kind: isSfx ? "sfx" : "music",
+          duration: r.duration || t.duration || null,
+          tags: r.tags || {},
+          note: r.note,
+          source_id: r.id, // 原剪映哈希名，溯源用
+        });
       } catch (e) { fail++; log("err", "整理导出", `${name} 失败：${e.message}`); }
     }
-    log("ok", "整理导出", `成功 ${ok}，跳过（已存在）${skip}，失败 ${fail} → ${outDir.name}`);
-    toast(`整理完成！复制 ${ok} 首，跳过 ${skip} 首${fail ? `，失败 ${fail} 首（见日志）` : ""}`, fail > 0, "thanks.png");
+    // 写 bgm_library.json（三件套的最后一件）
+    let jsonOk = false;
+    try {
+      const jh = await outDir.getFileHandle("bgm_library.json", { create: true });
+      const jw = await jh.createWritable();
+      await jw.write(JSON.stringify({
+        _meta: { app: "捞鱼打标工具", format: "organize-export", version: 1, exported_at: nowISO(), count: exportRecords.length },
+        records: exportRecords,
+      }, null, 2));
+      await jw.close();
+      jsonOk = true;
+    } catch (e) { log("err", "整理导出", "bgm_library.json 写入失败：" + e.message); }
+    log("ok", "整理导出", `音频 ${ok} 新写 / ${skip} 跳过 / ${fail} 失败；json ${jsonOk ? exportRecords.length + " 条" : "失败"} → ${outDir.name}`);
+    toast(`整理完成！${ok} 首 + 标签数据${jsonOk ? "（json）" : "（json 失败）"}${skip ? `，跳过 ${skip}` : ""}${fail ? `，失败 ${fail}（见日志）` : ""}`, fail > 0 || !jsonOk, "thanks.png");
   };
 });
 $("orgCancel").addEventListener("click", () => $("dlgOrganize").close());
+
+/* ══════════════ 🚀 超级导入（吃回「整理导出」三件套） ══════════════ */
+
+$("btnSuperImport").addEventListener("click", () => {
+  const inp = document.createElement("input");
+  inp.type = "file";
+  inp.webkitdirectory = true;
+  inp.onchange = async () => {
+    if (!inp.files.length) return;
+    await superImport([...inp.files]);
+  };
+  inp.click();
+});
+
+async function superImport(fileList) {
+  // 1. 按相对路径拆解三件套：音乐/、音效/、*.json
+  const audioExts = /\.(mp3|m4a|wav|ogg|flac|aac)$/i;
+  const musicFiles = [], sfxFiles = [], jsonFiles = [];
+  for (const f of fileList) {
+    const p = (f.webkitRelativePath || f.name).replace(/\\/g, "/");
+    const segs = p.split("/");
+    segs.pop(); // 去文件名，看目录
+    const dir = segs.join("/");
+    if (audioExts.test(f.name)) {
+      if (dir === "音乐" || dir.endsWith("/音乐") || dir.endsWith("/music")) musicFiles.push(f);
+      else if (dir === "音效" || dir.endsWith("/音效") || dir.endsWith("/sfx")) sfxFiles.push(f);
+      else { // 不在规范子目录里：按时长规则兜不了一定准，先按音乐收，可手动改
+        musicFiles.push(f);
+      }
+    } else if (/\.json$/i.test(f.name)) {
+      jsonFiles.push(f);
+    }
+  }
+  if (!musicFiles.length && !sfxFiles.length) {
+    toast("这个文件夹里没有音频文件，确认选的是「整理导出」产出的文件夹？", true, "wah.png");
+    return;
+  }
+
+  // 2. 音频入库（kind 由所在文件夹决定；id = 重命名后的主文件名）
+  let addedM = 0, addedS = 0, dup = 0;
+  for (const f of [...musicFiles, ...sfxFiles]) {
+    const isSfx = sfxFiles.includes(f);
+    const base = f.name.replace(/\.[^.]+$/, "");
+    if (state.tracks[base]) {
+      const t = state.tracks[base];
+      if (!t._file && !t.url) { // 占位补实体，并同步包里的分类结论
+        t._file = f; t.url = null;
+        t.kind = isSfx ? "sfx" : "music"; t.kindSource = "manual";
+      }
+      dup++;
+      continue;
+    }
+    let fmt = audioExts.exec(f.name)[1].toLowerCase();
+    try { const s = await sniffFormat(f); if (s) fmt = s; } catch (e) {}
+    state.tracks[base] = {
+      id: base, file: f.name, kind: isSfx ? "sfx" : "music",
+      kindSource: "manual", // 超级导入的类型来自导出时的分类，视为已确认
+      fmt, size: f.size, duration: null, _file: f, url: null,
+    };
+    isSfx ? addedS++ : addedM++;
+  }
+  rebuildOrder(); saveLocal(); renderAll();
+
+  // 3. Json 处理：有则问用户（合并 / 忽略），没有直接完成
+  const jsonFile = jsonFiles.find(f => /bgm_library\.json$/i.test(f.name)) || jsonFiles[0];
+  if (!jsonFile) {
+    log("ok", "超级导入", `入库 音乐 ${addedM} / 音效 ${addedS}${dup ? `，重复 ${dup}` : ""}；无 Json 文件`);
+    toast(`导入完成：音乐 ${addedM} + 音效 ${addedS}${dup ? `（重复 ${dup} 跳过）` : ""}，没找到 Json 文件`, false, "wave.png");
+    return;
+  }
+  let payload = null;
+  try { payload = JSON.parse(await jsonFile.text()); }
+  catch (e) {
+    toast("Json 文件解析失败：" + e.message + "（音频已入库，标签没导入）", true);
+    log("err", "超级导入", "Json 解析失败：" + e.message);
+    return;
+  }
+  const recs = payload && Array.isArray(payload.records) ? payload.records : null;
+  if (!recs) {
+    log("warn", "超级导入", `${jsonFile.name} 不是整理导出格式（缺 records 数组）`);
+    toast("音频已入库，但 Json 不是整理导出格式，标签数据没导入", true, "hmm.png");
+    return;
+  }
+  $("siPreview").innerHTML =
+    `素材包里有 <b>${recs.length}</b> 条标签数据（${jsonFile.name}）。<br>` +
+    `音频部分已入库：🎵 ${addedM} 首 + 🔊 ${addedS} 首${dup ? `（重复 ${dup} 跳过）` : ""}。<br><br>` +
+    `<b>增量合并</b>：把标签并进当前打开的库（已有人工记录不覆盖）<br>` +
+    `<b>只用当前库</b>：忽略包里的 Json，音频当白板从头打标`;
+  const dlg = $("dlgSuperImport");
+  dlg.showModal();
+  const finish = how => {
+    dlg.close();
+    if (how === "merge") {
+      let merged = 0, kept = 0;
+      for (const r of recs) {
+        if (!r || !r.id) continue;
+        if (state.records[r.id]) { kept++; continue; } // 已有记录人工优先，不覆盖
+        state.records[r.id] = {
+          id: r.id, file: r.file || r.id,
+          kind: r.kind || "music",
+          duration: r.duration || null,
+          tags: r.tags || {}, note: r.note,
+          source_id: r.source_id,
+          labeled_at: nowISO(), updated_at: nowISO(),
+        };
+        merged++;
+      }
+      log("ok", "超级导入", `标签合并：新增 ${merged} 条，保留已有 ${kept} 条`);
+      toast(`标签已合并：新增 ${merged} 条${kept ? `，${kept} 条已有记录未动` : ""}`, false, "thanks.png");
+    } else {
+      log("info", "超级导入", "按用户选择忽略包内 Json，仅音频入库");
+      toast("已忽略包里的 Json，用当前库继续", false, "hmm.png");
+    }
+    rebuildOrder(); scheduleSave("超级导入"); renderAll();
+    if (!state.current) playFirstVisible();
+  };
+  $("siMerge").onclick = () => finish("merge");
+  $("siIgnore").onclick = () => finish("ignore");
+  $("siCancel").onclick = () => { dlg.close(); log("warn", "超级导入", "用户取消（音频已入库）"); };
+}
 
 /* ══════════════ 标签组管理弹窗 ══════════════ */
 

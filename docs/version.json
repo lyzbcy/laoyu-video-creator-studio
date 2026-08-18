@@ -1,1 +1,1 @@
-{"version":"2.5.0","date":"2026-08-18","notes":["下载包结构大改：解压后第一层就是启动文件，不再藏子文件夹","新增「▶ 启动说明.txt」三行上手","命令行窗口中文显示修复"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
+{"version":"2.6.0","date":"2026-08-18","notes":["整理导出升级为三件套：音乐/ + 音效/ + bgm_library.json（标签随包，ID 同步为新文件名）","新增超级导入：整包文件夹导入，标签可增量合并（不覆盖人工记录）或忽略"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
