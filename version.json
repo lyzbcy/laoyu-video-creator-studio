@@ -1,1 +1,0 @@
-{"version":"2.4.1","date":"2026-08-18","notes":["修复命令行窗口中文乱码（统一 UTF-8 显示）","没装 Node.js 时给出友好引导而不是报错","工具已在运行时双击启动会自动帮你打开工具页"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}

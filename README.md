@@ -19,23 +19,23 @@
 
 ## 使用
 
-1. 下载 zip 解压（发布页或本仓库 `Code → Download ZIP`）
-2. 双击 `app/启动打标工具.bat`
+1. 下载 zip 解压（发布页或本仓库 `Code → Download ZIP`）——**解压后第一层就是全部文件**
+2. 看 `▶ 启动说明.txt`，双击 `启动打标工具.bat`
 3. 点「🔗 数据库」绑定 `bgm_library.jsonl`（首次绑定后自动重连）
 4. 听歌、打标、写备注，攒够后「📦 整理导出」
 
-详细说明见 [app/README.md](app/README.md)。
+详细说明见 [TOOL_README.md](TOOL_README.md)。
 
 ## 仓库结构
 
 ```
-├── index.html          ← 发布页（GitHub Pages）
-├── version.json        ← 版本清单（工具内更新检测读这个）
-└── app/                ← 工具本体
-    ├── index.html      ← 打标工具（单文件，无依赖）
-    ├── sync-server.js  ← 同步服务器（剪映缓存监控 + 一键更新）
-    ├── 启动/停止打标工具.bat
-    └── assets/stickers/ ← 表情贴纸（来自星星布丁精选表情包）
+├── 启动打标工具.bat     ← 双击这里启动（停止打标工具.bat 一键停止）
+├── ▶ 启动说明.txt       ← 三行上手
+├── index.html           ← 打标工具（单文件，无依赖）
+├── sync-server.js       ← 同步服务器（剪映缓存监控 + 一键更新）
+├── assets/stickers/     ← 表情贴纸（来自星星布丁精选表情包）
+├── bgm_library.jsonl.template ← 数据库模板
+└── docs/                ← 发布页（GitHub Pages，与本工具无关）
 ```
 
 ## 版本
