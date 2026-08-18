@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>捞鱼打标工具 — BGM/音效边听边打标小铺</title>
+<meta name="description" content="给 BGM 和音效建自己的标签库：边听边打标、剪映缓存自动同步、一键整理导出、备注智能打标。零安装，双击即用。">
+<style>
+  :root {
+    --bg: #f5efe3; --paper: #fffdf6; --border: #e6dbc4; --border-strong: #d5c6a5;
+    --ink: #57452f; --ink-soft: #8a7659; --ink-faint: #b3a184;
+    --tang: #e8613c; --tang-deep: #cf4a28; --tang-soft: #fbe3da;
+    --moss: #7fa863; --moss-soft: #e7f0dd; --berry: #9a7bb8; --sky: #6d94b8;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "微软雅黑", "楷体", sans-serif;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 10% 5%, rgba(232,97,60,.06) 0 200px, transparent 201px),
+      radial-gradient(circle at 90% 95%, rgba(127,168,99,.08) 0 260px, transparent 261px);
+    color: var(--ink); line-height: 1.7;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 22px; }
+  .card { background: var(--paper); border: 2px solid var(--border); border-radius: 20px; box-shadow: 0 2px 0 var(--border-strong), 0 10px 26px rgba(140,110,60,.12); }
+
+  /* 导航 */
+  nav { position: sticky; top: 0; z-index: 10; background: rgba(255,253,246,.92); backdrop-filter: blur(8px); border-bottom: 2px solid var(--border); }
+  nav .wrap { display: flex; align-items: center; gap: 14px; height: 60px; }
+  nav .logo { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; }
+  nav .logo img { width: 34px; height: 34px; }
+  nav a { color: var(--ink-soft); text-decoration: none; font-size: 14px; }
+  nav a:hover { color: var(--tang); }
+  nav .links { display: flex; gap: 18px; margin-left: auto; }
+  nav .dl-btn { background: var(--tang); color: #fff !important; padding: 6px 16px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 0 var(--tang-deep); }
+
+  /* hero */
+  .hero { padding: 64px 0 44px; text-align: center; }
+  .hero .fish { display: flex; justify-content: center; gap: 18px; margin-bottom: 26px; }
+  .hero .fish img { width: 84px; height: 84px; animation: wobble 3s ease-in-out infinite; }
+  .hero .fish img:nth-child(2) { animation-delay: .5s; width: 100px; height: 100px; margin-top: -10px; }
+  .hero .fish img:nth-child(3) { animation-delay: 1s; }
+  @keyframes wobble { 0%,100% { transform: rotate(-4deg);} 50% { transform: rotate(4deg);} }
+  .hero h1 { font-size: 40px; line-height: 1.3; letter-spacing: 1px; }
+  .hero h1 em { font-style: normal; color: var(--tang); }
+  .hero .sub { color: var(--ink-soft); font-size: 17px; margin: 14px 0 30px; }
+  .hero .btns { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+  .btn { display: inline-block; padding: 13px 30px; border-radius: 16px; font-size: 16px; text-decoration: none; cursor: pointer; border: 2px solid; transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
+  .btn:active { transform: scale(.94); }
+  .btn.primary { background: var(--tang); border-color: var(--tang-deep); color: #fff; font-weight: 700; box-shadow: 0 3px 0 var(--tang-deep); }
+  .btn.primary:hover { background: #ef7250; }
+  .btn.ghost { background: var(--paper); border-color: var(--border-strong); color: var(--ink); box-shadow: 0 3px 0 var(--border-strong); }
+  .btn.ghost:hover { border-color: var(--tang); }
+  .hero .meta { margin-top: 18px; font-size: 13px; color: var(--ink-faint); }
+
+  /* section 通用 */
+  section { padding: 52px 0; }
+  .kicker { text-align: center; color: var(--tang); font-size: 13px; letter-spacing: 3px; font-weight: 700; margin-bottom: 8px; }
+  h2.title { text-align: center; font-size: 28px; margin-bottom: 10px; }
+  p.desc { text-align: center; color: var(--ink-soft); margin-bottom: 34px; }
+
+  /* 功能卡 */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px; }
+  .feature { padding: 22px; }
+  .feature .icon { width: 48px; height: 48px; border-radius: 14px; background: var(--tang-soft); display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 14px; }
+  .feature:nth-child(2n) .icon { background: var(--moss-soft); }
+  .feature:nth-child(3n) .icon { background: #efe6f6; }
+  .feature h3 { font-size: 17px; margin-bottom: 8px; }
+  .feature p { font-size: 14px; color: var(--ink-soft); }
+  .feature b { color: var(--tang); }
+
+  /* 步骤 */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; counter-reset: step; }
+  .step { padding: 20px; position: relative; }
+  .step .num { width: 34px; height: 34px; border-radius: 50%; background: var(--tang); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; box-shadow: 0 2px 0 var(--tang-deep); }
+  .step h3 { font-size: 16px; margin-bottom: 6px; }
+  .step p { font-size: 13.5px; color: var(--ink-soft); }
+  .step code { background: var(--bg); padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+
+  /* 更新说明 */
+  .update-box { padding: 26px; display: flex; gap: 20px; align-items: flex-start; }
+  .update-box img { width: 64px; height: 64px; flex-shrink: 0; animation: wobble 3.4s ease-in-out infinite; }
+  .update-box h3 { margin-bottom: 8px; }
+
+  /* 页脚 */
+  footer { border-top: 2px dashed var(--border); padding: 30px 0 40px; text-align: center; color: var(--ink-faint); font-size: 13px; }
+  footer img { width: 40px; height: 40px; margin-bottom: 8px; }
+  footer a { color: var(--ink-soft); }
+
+  /* 更新横幅示例 */
+  .banner-demo { margin: 0 auto 30px; max-width: 640px; background: #faf0d8; border: 2px solid #d8b968; border-radius: 14px; padding: 12px 18px; display: flex; align-items: center; gap: 12px; font-size: 14px; color: #7a5511; }
+  .banner-demo .btn { padding: 6px 14px; font-size: 13px; }
+
+  @media (max-width: 640px) {
+    nav .links a:not(.dl-btn) { display: none; }
+    .hero h1 { font-size: 30px; }
+    .update-box { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <span class="logo"><img src="app/assets/stickers/happy.png" alt="捞鱼">捞鱼打标工具</span>
+    <div class="links">
+      <a href="#features">功能</a>
+      <a href="#quick">快速上手</a>
+      <a href="#update">更新机制</a>
+      <a class="dl-btn" id="navDl" href="#">下载 Windows 版</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap">
+  <div class="fish">
+    <img src="app/assets/stickers/love.png" alt="">
+    <img src="app/assets/stickers/happy.png" alt="捞鱼">
+    <img src="app/assets/stickers/cheer.png" alt="">
+  </div>
+  <h1>给每一首 BGM<br>一个<em>记得住的标签</em></h1>
+  <p class="sub">边听边打标的本地小工具 —— 音乐/音效分类管理、剪映缓存自动同步、备注智能打标、一键整理导出。<br>零安装、零依赖、数据完全在自己电脑里。</p>
+  <div class="btns">
+    <a class="btn primary" id="heroDl" href="#">📦 下载 Windows 版</a>
+    <a class="btn ghost" href="#quick">查看上手方法</a>
+  </div>
+  <p class="meta" id="verMeta">当前版本 v2.3.0 · 适配 Windows（Mac 版在路上）· 需要已安装 Node.js</p>
+</header>
+
+<section id="features" class="wrap">
+  <p class="kicker">WHY LAOYU</p>
+  <h2 class="title">做漫剧的人，都懂找不到配乐的痛</h2>
+  <p class="desc">曲子下了几百首，全是一串看不懂的哈希文件名。捞鱼打标工具把「听 → 记 → 找」变成一条流水线。</p>
+  <div class="grid">
+    <div class="feature card">
+      <div class="icon">🎧</div>
+      <h3>边听边打标</h3>
+      <p>播放器 + 波形图 + 2 倍速试听，空格暂停、方向键切歌。情绪/场景/剧情三组标签点一下就打上，<b>打完按 → 直接下一首</b>。</p>
+    </div>
+    <div class="feature card">
+      <div class="icon">🔄</div>
+      <h3>剪映缓存自动同步</h3>
+      <p>双击启动后<b>自动监控剪映音乐缓存</b>：你在剪映里新听的曲子，最迟 1 分钟自动出现在工具里，不用手动选任何文件夹。</p>
+    </div>
+    <div class="feature card">
+      <div class="icon">🎵🔊</div>
+      <h3>音乐 / 音效分库</h3>
+      <p>两类素材分开入库、分开筛选、<b>打包时分进不同文件夹</b>。单个标错了？一键切换类型。</p>
+    </div>
+    <div class="feature card">
+      <div class="icon">✨</div>
+      <h3>备注智能打标</h3>
+      <p>备注里写「低音铺底渐强、副歌激昂」——点一下 ✨，工具自动补上「铺垫、燃」等标签。<b>只做增量，绝不动你手工打的标签</b>。</p>
+    </div>
+    <div class="feature card">
+      <div class="icon">📦</div>
+      <h3>一键整理导出</h3>
+      <p>打完标的曲子按 <code>紧张·燃-对峙-铺垫_哈希.mp3</code> 标准名复制到你选的文件夹，<b>不改剪映缓存原件</b>，交素材一步到位。</p>
+    </div>
+    <div class="feature card">
+      <div class="icon">🔗</div>
+      <h3>数据库联动</h3>
+      <p>JSONL 数据库绑定一次，之后<b>自动保存、自动重连</b>；文件被外部改动 5 秒内同步回界面。数据是纯文本，永远属于你。</p>
+    </div>
+  </div>
+</section>
+
+<section id="quick" class="wrap">
+  <p class="kicker">GET STARTED</p>
+  <h2 class="title">四步开张</h2>
+  <p class="desc">从下载到打出第一个标签，不超过三分钟。</p>
+  <div class="steps">
+    <div class="step card"><div class="num">1</div><h3>下载解压</h3><p>点上面下载按钮拿到 zip，解压到任意文件夹。</p></div>
+    <div class="step card"><div class="num">2</div><h3>双击启动</h3><p>双击 <code>启动打标工具.bat</code>，自动打开工具页并同步剪映缓存。想关就点黑窗口右上角 ×，或双击「停止打标工具.bat」。</p></div>
+    <div class="step card"><div class="num">3</div><h3>绑定数据库</h3><p>点「🔗 数据库」选中 <code>bgm_library.jsonl</code>——只需这一次，以后自动重连、自动保存。</p></div>
+    <div class="step card"><div class="num">4</div><h3>开打！</h3><p>听曲子、点标签、写备注，按 → 下一首。攒够标签后「📦 整理导出」交成品。</p></div>
+  </div>
+</section>
+
+<section id="update" class="wrap">
+  <p class="kicker">KEEP FRESH</p>
+  <h2 class="title">会自己提醒更新的小工具</h2>
+  <p class="desc">每次打开工具，它都会悄悄问一下这个发布页：有新版本吗？</p>
+  <div class="banner-demo">
+    🆕 发现新版本 v<span id="demoVer">2.3.0</span>：修复进度条拖动 · 新增发布系统
+    <a class="btn primary" href="#">一键更新</a>
+    <a class="btn ghost" href="#">忽略此版本</a>
+  </div>
+  <div class="update-box card">
+    <img src="app/assets/stickers/salute.png" alt="">
+    <div>
+      <h3>更新机制</h3>
+      <p style="color:var(--ink-soft); font-size:14px">
+        工具打开时自动对比本地与发布页的版本号，有更新就在顶部弹出提醒条。
+        点「一键更新」，工具会让本地服务自动下载最新版并完成替换（你的标签数据、备注一律保留），更新完刷新页面即可。
+        网络不好或想手动来，也可以点「打开发布页」重新下载覆盖。版本记录见 <a href="https://github.com/lyzbcy/laoyu-tagger/releases" style="color:var(--tang)">Releases</a>。
+      </p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <img src="app/assets/stickers/laoyu.png" alt="捞鱼">
+  <p>捞鱼打标工具 · 由一个弱小但有梦想的开发者维护</p>
+  <p><a href="https://github.com/lyzbcy/laoyu-tagger">GitHub 仓库</a> · 表情来自星星布丁精选 · 数据永远在你自己电脑里</p>
+</footer>
+
+<script>
+// 版本信息动态化：读 version.json
+fetch("version.json", { cache: "no-store" })
+  .then(r => r.json())
+  .then(v => {
+    document.getElementById("verMeta").textContent =
+      `当前版本 v${v.version} · 适配 Windows（Mac 版在路上）· 需要已安装 Node.js`;
+    document.getElementById("demoVer").textContent = v.version;
+    document.title = `捞鱼打标工具 v${v.version} — BGM/音效边听边打标小铺`;
+  })
+  .catch(() => {});
+// 下载按钮：仓库源码 zip
+const ZIP = "https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip";
+document.getElementById("navDl").href = ZIP;
+document.getElementById("heroDl").href = ZIP;
+// ?dl=1 自动下载
+if (new URLSearchParams(location.search).get("dl") === "1") {
+  setTimeout(() => { location.href = ZIP; }, 600);
+}
+</script>
+</body>
+</html>
