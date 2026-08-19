@@ -523,6 +523,7 @@
   <span id="dbStatus">未绑定 — 数据只存浏览器本地</span>
   <span class="spacer"></span>
   <button class="btn bouncy" id="btnAiTag" title="根据备注文本自动补标签（增量，不覆盖已有标签）">✨ 备注打标</button>
+  <button class="btn bouncy" id="btnRename" title="把已打标项目在列表里的名称一键更新为标准命名（格式同整理导出；内部 ID 不变，不影响同步）">🏷️ 一键更新名称</button>
   <button class="btn primary bouncy" id="btnOrganize" title="把已打标文件按标准名复制到指定文件夹">📦 整理导出</button>
   <button class="btn moss bouncy" id="btnSuperImport" title="导入「整理导出」产出的完整素材包（音乐/音效/Json 三件套）">🚀 超级导入</button>
   <button class="btn bouncy" id="btnLog">📒 日志</button>
@@ -686,7 +687,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.7.0";
+const APP_VERSION = "2.8.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -836,7 +837,7 @@ function snapshot() {
   const tracks = {};
   for (const id in state.tracks) {
     const t = state.tracks[id];
-    tracks[id] = { id: t.id, file: t.file, kind: t.kind, kindSource: t.kindSource || null, fmt: t.fmt, size: t.size, duration: t.duration };
+    tracks[id] = { id: t.id, file: t.file, displayName: t.displayName || null, kind: t.kind, kindSource: t.kindSource || null, waveChecked: t.waveChecked || false, fmt: t.fmt, size: t.size, duration: t.duration };
   }
   return { groups: state.groups, tracks, records: state.records, order: state.order, current: state.current };
 }
@@ -1160,7 +1161,7 @@ function renderNowName() {
   if (!t) { el.innerHTML = `还没有选中音频，先从左边挑一首吧 <span class="fmt"></span>`; return; }
   const fake = t.file.toLowerCase().endsWith(".mp3") && t.fmt === "m4a";
   const kindText = t.kind === "sfx" ? "🔊音效" : t.kind === "ambient" ? "🌫️底噪" : "🎵音乐";
-  el.innerHTML = `${t.file}` +
+  el.innerHTML = `${t.displayName || t.file}` +
     `<span class="fmt">${kindText} · ${t.fmt.toUpperCase()}${fake ? "（扩展名伪装已纠正）" : ""}${t.duration ? " · " + fmtTime(t.duration) : ""}</span>`;
   // 角落贴纸随类型换心情
   $("cornerSticker").src = t.kind === "sfx" ? "assets/stickers/hmm.png" : t.kind === "ambient" ? "assets/stickers/sleepy.png" : "assets/stickers/wave.png";
@@ -1301,7 +1302,8 @@ function visibleIds() {
   const q = state.search.trim().toLowerCase();
   if (q) ids = ids.filter(id => {
     const r = state.records[id];
-    const inName = id.toLowerCase().includes(q);
+    const t = state.tracks[id];
+    const inName = (t.displayName || id).toLowerCase().includes(q) || id.toLowerCase().includes(q);
     const inNote = r && r.note && r.note.toLowerCase().includes(q); // 备注搜索：辅助选曲
     return inName || inNote;
   });
@@ -1336,7 +1338,7 @@ function renderList() {
     const preview = r ? Object.values(r.tags).flat().slice(0, 4).join("·") : "";
     div.innerHTML = `<span class="status">${isLabeled(id) ? "✅" : "⬜"}</span>` +
       `<span class="kindBadge ${t.kind || "music"}">${t.kind === "sfx" ? "音效" : t.kind === "ambient" ? "底噪" : "音乐"}</span>` +
-      `<span class="name">${t.file}</span>` +
+      `<span class="name">${t.displayName || t.file}</span>` +
       (preview ? `<span class="preview-tags">${preview}</span>` : "") +
       `<span class="dur">${t.duration ? fmtTime(t.duration) : ""}</span>`;
     div.onclick = () => playTrack(id);
@@ -1636,6 +1638,30 @@ $("btnOrganize").addEventListener("click", async () => {
   };
 });
 $("orgCancel").addEventListener("click", () => $("dlgOrganize").close());
+
+/* ══════════════ 🏷️ 一键更新已打标项目名称 ══════════════
+   把已打标项目在工具列表里的显示名一键刷新为标准命名（格式与整理导出完全一致）。
+   只更新 track.displayName 和 record.file（记录名）；track.id 保持原哈希不动，
+   这样剪映缓存增量同步仍按原哈希匹配，不会重复入库。可反复点，名称跟随最新标签。 */
+$("btnRename").addEventListener("click", () => {
+  const labeled = Object.values(state.records).filter(r => isLabeled(r.id) && state.tracks[r.id]);
+  if (!labeled.length) { toast("还没有已打标的项目，先打几个标签吧", true, "sleepy.png"); return; }
+  let renamed = 0;
+  for (const r of labeled) {
+    const t = state.tracks[r.id];
+    const newName = stdNameFor(r, t);
+    if (t.displayName !== newName || r.file !== newName) {
+      t.displayName = newName;
+      r.file = newName;
+      r.updated_at = nowISO();
+      renamed++;
+    }
+  }
+  log("ok", "一键更新名称", `${renamed ? renamed + " 个项目已更新为标准命名" : "名称都已是最新的"}（内部 ID 未动）`);
+  renderAll();
+  scheduleSave("一键更新名称");
+  toast(renamed ? `已把 ${renamed} 个项目更新为标准命名 🏷️（ID 不变，同步不受影响）` : "名称都是最新的，不用更新", false, "cheer.png");
+});
 
 /* ══════════════ 🚀 超级导入（吃回「整理导出」三件套） ══════════════ */
 

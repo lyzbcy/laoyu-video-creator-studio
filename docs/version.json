@@ -1,1 +1,1 @@
-{"version":"2.7.0","date":"2026-08-18","notes":["新增第三种类型「环境底噪」：20~60 秒自动归底噪，波形起伏大自动改判音乐，人工三态切换最终确认","分类标准升级：20 秒以下音效 / 20~60 秒环境底噪 / 60 秒以上音乐","整理导出/超级导入支持环境底噪目录"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
+{"version":"2.8.0","date":"2026-08-18","notes":["新增「一键更新名称」：已打标项目在列表里一键刷新为标准命名（格式与整理导出一致），内部 ID 不变不影响同步","列表、当前播放标题、搜索均支持新名称"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
