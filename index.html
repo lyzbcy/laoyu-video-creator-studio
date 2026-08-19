@@ -259,6 +259,7 @@
   }
   .kindBadge.music { color: #4c6b3a; background: var(--moss-soft); border-color: var(--moss); }
   .kindBadge.sfx { color: #4a5f86; background: var(--sky-soft); border-color: var(--sky); }
+  .kindBadge.ambient { color: #6a6a78; background: #ececf1; border-color: #a8a8bc; }
   .track .name {
     flex: 1;
     font-size: 11.5px;
@@ -551,9 +552,10 @@
         <button data-f="unlabeled">⬜ 未打<span class="cnt" id="cntTodo"></span></button>
       </div>
       <div class="filterRow">
-        <button class="active" data-k="all">🎵+🔊</button>
+        <button class="active" data-k="all">🎵+🔊+🌫️</button>
         <button data-k="music">🎵 音乐</button>
         <button data-k="sfx">🔊 音效</button>
+        <button data-k="ambient">🌫️ 底噪</button>
       </div>
       <div id="tagFilterRow"></div>
     </div>
@@ -684,7 +686,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.6.0";
+const APP_VERSION = "2.7.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -1069,18 +1071,42 @@ async function addDirectory(fileList, dirKind) {
 
 function rebuildOrder() { state.order = Object.keys(state.tracks).sort(); }
 
-/* ── 音乐/音效自动预分类（一次性，人工改过永不覆盖）─────────────
-   标准：< 30s 归音效（典型音效 ≤10s，环境音 10~30s 也偏音效用场）
-         ≥ 30s 归音乐（典型 1 分钟以上）
-   kindSource: null=还没判过（等时长数据） / auto=自动判过 / manual=人工改过 */
-function autoKindOf(duration) { return duration != null && duration >= 30 ? "music" : "sfx"; }
+/* ── 三类自动预分类（一次性，人工改过永不覆盖）─────────────────
+   时长初判（入库即判）：< 20s 音效 / 20~60s 环境底噪 / ≥ 60s 音乐
+   波形精修（首次解码波形，仅对底噪段、仅一次）：起伏大→改判音乐
+   kindSource: null=未判 / auto=自动判过 / manual=人工改过（最高优先，永不被自动逻辑触碰）*/
+function autoKindOf(duration) {
+  if (duration == null) return "music";
+  if (duration < 20) return "sfx";
+  if (duration < 60) return "ambient";
+  return "music";
+}
 
 function applyAutoKind(track, duration) {
-  if (track.kindSource === "manual" || track.kindSource === "auto") return false; // 只判一次
+  if (track.kindSource === "manual" || track.kindSource === "auto") return false; // 时长判只判一次
   if (duration == null || !isFinite(duration)) return false;
   track.kind = autoKindOf(duration);
   track.kindSource = "auto";
   return true;
+}
+
+// 波形精修：底噪段若波形起伏大（变异系数高=有明显段落/高潮结构），改判音乐
+function waveformRefine(track, peaks) {
+  if (track.kindSource !== "auto" || track.kind !== "ambient" || track.waveChecked) return false;
+  track.waveChecked = true; // 只精修一次
+  if (!peaks || peaks.length < 50) return false;
+  let sum = 0, sum2 = 0;
+  for (const v of peaks) { sum += v; sum2 += v * v; }
+  const n = peaks.length, mean = sum / n;
+  const std = Math.sqrt(Math.max(0, sum2 / n - mean * mean));
+  const cv = mean > 0.01 ? std / mean : 0; // 变异系数：平稳底噪低、结构音乐高
+  if (cv >= 0.6) {
+    track.kind = "music";
+    if (state.records[track.id]) state.records[track.id].kind = "music";
+    log("info", "波形精修", `${track.file.slice(0, 12)}… 底噪→音乐（波形起伏系数 ${cv.toFixed(2)}）`);
+    return true;
+  }
+  return false;
 }
 
 function pickDirectory(kind) {
@@ -1133,10 +1159,11 @@ function renderNowName() {
   el.style.animation = "none"; void el.offsetWidth; el.style.animation = ""; // 重触发弹入
   if (!t) { el.innerHTML = `还没有选中音频，先从左边挑一首吧 <span class="fmt"></span>`; return; }
   const fake = t.file.toLowerCase().endsWith(".mp3") && t.fmt === "m4a";
+  const kindText = t.kind === "sfx" ? "🔊音效" : t.kind === "ambient" ? "🌫️底噪" : "🎵音乐";
   el.innerHTML = `${t.file}` +
-    `<span class="fmt">${t.kind === "sfx" ? "🔊音效" : "🎵音乐"} · ${t.fmt.toUpperCase()}${fake ? "（扩展名伪装已纠正）" : ""}${t.duration ? " · " + fmtTime(t.duration) : ""}</span>`;
+    `<span class="fmt">${kindText} · ${t.fmt.toUpperCase()}${fake ? "（扩展名伪装已纠正）" : ""}${t.duration ? " · " + fmtTime(t.duration) : ""}</span>`;
   // 角落贴纸随类型换心情
-  $("cornerSticker").src = t.kind === "sfx" ? "assets/stickers/hmm.png" : "assets/stickers/wave.png";
+  $("cornerSticker").src = t.kind === "sfx" ? "assets/stickers/hmm.png" : t.kind === "ambient" ? "assets/stickers/sleepy.png" : "assets/stickers/wave.png";
 }
 
 audio.addEventListener("loadedmetadata", () => {
@@ -1253,7 +1280,8 @@ async function drawWave(t) {
       peaks[i] = max;
     }
     waveCache[t.id] = peaks;
-    if (state.current === t.id) drawPeaks(peaks);
+    waveformRefine(t, peaks); // 波形精修：底噪段起伏大则改判音乐（人工锁定不动）
+    if (state.current === t.id) { drawPeaks(peaks); renderList(); renderTagPanel(); }
   } catch (e) {
     if (state.current === t.id) drawPlaceholder("波形解码失败（不影响播放）");
     log("warn", "波形", `${t.file} 解码失败：${e.message}`);
@@ -1307,7 +1335,7 @@ function renderList() {
     const r = state.records[id];
     const preview = r ? Object.values(r.tags).flat().slice(0, 4).join("·") : "";
     div.innerHTML = `<span class="status">${isLabeled(id) ? "✅" : "⬜"}</span>` +
-      `<span class="kindBadge ${t.kind || "music"}">${t.kind === "sfx" ? "音效" : "音乐"}</span>` +
+      `<span class="kindBadge ${t.kind || "music"}">${t.kind === "sfx" ? "音效" : t.kind === "ambient" ? "底噪" : "音乐"}</span>` +
       `<span class="name">${t.file}</span>` +
       (preview ? `<span class="preview-tags">${preview}</span>` : "") +
       `<span class="dur">${t.duration ? fmtTime(t.duration) : ""}</span>`;
@@ -1411,7 +1439,7 @@ function renderTagPanel() {
   $("noteBox").disabled = !cur;
   // 类型切换按钮
   const t = cur ? state.tracks[cur] : null;
-  $("btnKind").textContent = t && t.kind === "sfx" ? "🔊 这是音效" : "🎵 这是音乐";
+  $("btnKind").textContent = t ? kindBtnText(t.kind) : "🎵 这是音乐";
 }
 
 function toggleTag(group, tag, onlyOff) {
@@ -1427,12 +1455,17 @@ function toggleTag(group, tag, onlyOff) {
   scheduleSave("打标");
 }
 
-// 切换当前曲类型（人工修正，之后自动分类永不再动它）
+// 类型切换按钮文案（三态循环）
+function kindBtnText(kind) {
+  return kind === "sfx" ? "🔊 这是音效" : kind === "ambient" ? "🌫️ 这是底噪" : "🎵 这是音乐";
+}
+
+// 切换当前曲类型（三态循环：音乐→音效→底噪→音乐；人工修正，之后自动分类永不再动它）
 $("btnKind").addEventListener("click", () => {
   const id = state.current;
   if (!id) return;
   const t = state.tracks[id];
-  t.kind = t.kind === "sfx" ? "music" : "sfx";
+  t.kind = t.kind === "music" ? "sfx" : t.kind === "sfx" ? "ambient" : "music";
   t.kindSource = "manual";
   if (state.records[id]) {
     state.records[id].kind = t.kind;
@@ -1443,7 +1476,7 @@ $("btnKind").addEventListener("click", () => {
   }
   log("info", "改类型", `${t.file} → ${t.kind}（人工，锁定）`);
   renderTagPanel(); renderList(); renderNowName();
-  toast(t.kind === "sfx" ? "改成音效了 🔊（已锁定，自动分类不再动它）" : "改成音乐了 🎵（已锁定，自动分类不再动它）", false, "hmm.png");
+  toast(kindBtnText(t.kind) + "（已锁定，自动分类不再动它）", false, "hmm.png");
 });
 
 let noteSaveTimer = null;
@@ -1536,11 +1569,10 @@ $("btnOrganize").addEventListener("click", async () => {
   const labeled = Object.values(state.records).filter(r => isLabeled(r.id) && state.tracks[r.id]);
   if (!labeled.length) { toast("还没有已打标的音频，先打几首再整理", true, "sleepy.png"); return; }
   const withFile = labeled.filter(r => state.tracks[r.id]._file || state.tracks[r.id].url);
-  const musicN = withFile.filter(r => (r.kind || "music") === "music").length;
-  const sfxN = withFile.length - musicN;
+  const byKind = k => withFile.filter(r => (r.kind || "music") === k).length;
   $("orgPreview").innerHTML =
     `将导出完整素材包到你选的文件夹：<br>` +
-    `├ 🎵 音乐/ <b>${musicN}</b> 首　├ 🔊 音效/ <b>${sfxN}</b> 首<br>` +
+    `├ 🎵 音乐/ <b>${byKind("music")}</b> 首　├ 🔊 音效/ <b>${byKind("sfx")}</b> 首　├ 🌫️ 环境底噪/ <b>${byKind("ambient")}</b> 首<br>` +
     `└ 📄 bgm_library.json（标签数据，ID 已同步为重命名后的新名，可「🚀 超级导入」还原）<br>` +
     `命名格式：<code>情绪标签-场景标签-剧情标签_哈希前8位.扩展名</code><br>` +
     `<span style="color:var(--ink-faint);font-size:12px">只复制不改原文件；同名已存在会跳过。${labeled.length - withFile.length ? `${labeled.length - withFile.length} 首需要重新添加目录后才能导出。` : ""}</span>`;
@@ -1553,13 +1585,16 @@ $("btnOrganize").addEventListener("click", async () => {
     catch (e) { return; }
     let ok = 0, skip = 0, fail = 0;
     const exportRecords = []; // 随包导出的标签数据（ID=新名，source_id 溯源）
-    const dirMusic = await outDir.getDirectoryHandle("音乐", { create: true });
-    const dirSfx = await outDir.getDirectoryHandle("音效", { create: true });
+    const dirByKind = {
+      music: await outDir.getDirectoryHandle("音乐", { create: true }),
+      sfx: await outDir.getDirectoryHandle("音效", { create: true }),
+      ambient: await outDir.getDirectoryHandle("环境底噪", { create: true }),
+    };
     toast("整理中…", false, "cheer.png");
     for (const r of withFile) {
       const t = state.tracks[r.id];
-      const isSfx = (r.kind || "music") === "sfx";
-      const dir = isSfx ? dirSfx : dirMusic;
+      const kind = r.kind || "music";
+      const dir = dirByKind[kind];
       const name = stdNameFor(r, t);
       try {
         const fh = await dir.getFileHandle(name, { create: true });
@@ -1576,7 +1611,7 @@ $("btnOrganize").addEventListener("click", async () => {
         exportRecords.push({
           id: name.replace(/\.[^.]+$/, ""),
           file: name,
-          kind: isSfx ? "sfx" : "music",
+          kind,
           duration: r.duration || t.duration || null,
           tags: r.tags || {},
           note: r.note,
@@ -1616,9 +1651,9 @@ $("btnSuperImport").addEventListener("click", () => {
 });
 
 async function superImport(fileList) {
-  // 1. 按相对路径拆解三件套：音乐/、音效/、*.json
+  // 1. 按相对路径拆解素材包：音乐/、音效/、环境底噪/、*.json
   const audioExts = /\.(mp3|m4a|wav|ogg|flac|aac)$/i;
-  const musicFiles = [], sfxFiles = [], jsonFiles = [];
+  const musicFiles = [], sfxFiles = [], ambFiles = [], jsonFiles = [];
   for (const f of fileList) {
     const p = (f.webkitRelativePath || f.name).replace(/\\/g, "/");
     const segs = p.split("/");
@@ -1627,6 +1662,7 @@ async function superImport(fileList) {
     if (audioExts.test(f.name)) {
       if (dir === "音乐" || dir.endsWith("/音乐") || dir.endsWith("/music")) musicFiles.push(f);
       else if (dir === "音效" || dir.endsWith("/音效") || dir.endsWith("/sfx")) sfxFiles.push(f);
+      else if (dir === "环境底噪" || dir.endsWith("/环境底噪") || dir.endsWith("/ambient")) ambFiles.push(f);
       else { // 不在规范子目录里：按时长规则兜不了一定准，先按音乐收，可手动改
         musicFiles.push(f);
       }
@@ -1640,15 +1676,15 @@ async function superImport(fileList) {
   }
 
   // 2. 音频入库（kind 由所在文件夹决定；id = 重命名后的主文件名）
-  let addedM = 0, addedS = 0, dup = 0;
-  for (const f of [...musicFiles, ...sfxFiles]) {
-    const isSfx = sfxFiles.includes(f);
+  let addedM = 0, addedS = 0, addedA = 0, dup = 0;
+  for (const f of [...musicFiles, ...sfxFiles, ...ambFiles]) {
+    const kind = sfxFiles.includes(f) ? "sfx" : ambFiles.includes(f) ? "ambient" : "music";
     const base = f.name.replace(/\.[^.]+$/, "");
     if (state.tracks[base]) {
       const t = state.tracks[base];
       if (!t._file && !t.url) { // 占位补实体，并同步包里的分类结论
         t._file = f; t.url = null;
-        t.kind = isSfx ? "sfx" : "music"; t.kindSource = "manual";
+        t.kind = kind; t.kindSource = "manual";
       }
       dup++;
       continue;
@@ -1656,19 +1692,19 @@ async function superImport(fileList) {
     let fmt = audioExts.exec(f.name)[1].toLowerCase();
     try { const s = await sniffFormat(f); if (s) fmt = s; } catch (e) {}
     state.tracks[base] = {
-      id: base, file: f.name, kind: isSfx ? "sfx" : "music",
+      id: base, file: f.name, kind,
       kindSource: "manual", // 超级导入的类型来自导出时的分类，视为已确认
       fmt, size: f.size, duration: null, _file: f, url: null,
     };
-    isSfx ? addedS++ : addedM++;
+    if (kind === "sfx") addedS++; else if (kind === "ambient") addedA++; else addedM++;
   }
   rebuildOrder(); saveLocal(); renderAll();
 
   // 3. Json 处理：有则问用户（合并 / 忽略），没有直接完成
   const jsonFile = jsonFiles.find(f => /bgm_library\.json$/i.test(f.name)) || jsonFiles[0];
   if (!jsonFile) {
-    log("ok", "超级导入", `入库 音乐 ${addedM} / 音效 ${addedS}${dup ? `，重复 ${dup}` : ""}；无 Json 文件`);
-    toast(`导入完成：音乐 ${addedM} + 音效 ${addedS}${dup ? `（重复 ${dup} 跳过）` : ""}，没找到 Json 文件`, false, "wave.png");
+    log("ok", "超级导入", `入库 音乐 ${addedM} / 音效 ${addedS} / 底噪 ${addedA}${dup ? `，重复 ${dup}` : ""}；无 Json 文件`);
+    toast(`导入完成：音乐 ${addedM} + 音效 ${addedS} + 底噪 ${addedA}${dup ? `（重复 ${dup} 跳过）` : ""}，没找到 Json 文件`, false, "wave.png");
     return;
   }
   let payload = null;
@@ -1686,7 +1722,7 @@ async function superImport(fileList) {
   }
   $("siPreview").innerHTML =
     `素材包里有 <b>${recs.length}</b> 条标签数据（${jsonFile.name}）。<br>` +
-    `音频部分已入库：🎵 ${addedM} 首 + 🔊 ${addedS} 首${dup ? `（重复 ${dup} 跳过）` : ""}。<br><br>` +
+    `音频部分已入库：🎵 ${addedM} + 🔊 ${addedS} + 🌫️ ${addedA}${dup ? `（重复 ${dup} 跳过）` : ""}。<br><br>` +
     `<b>增量合并</b>：把标签并进当前打开的库（已有人工记录不覆盖）<br>` +
     `<b>只用当前库</b>：忽略包里的 Json，音频当白板从头打标`;
   const dlg = $("dlgSuperImport");
@@ -2016,6 +2052,14 @@ if (restored) {
   for (const id in state.tracks) {
     const t = state.tracks[id];
     t._file = null; // File 对象不可序列化，重启后需重新添加目录
+    // 分类标准升级重算：auto 的跟随最新标准（如 v2.7 新增环境底噪段），manual 的人工判定神圣不可侵犯
+    if (t.kindSource === "auto" && t.duration != null) {
+      const re = autoKindOf(t.duration);
+      if (re !== t.kind) {
+        t.kind = re;
+        if (state.records[id] && state.records[id].kindSource !== "manual") state.records[id].kind = re;
+      }
+    }
   }
 }
 renderAll();

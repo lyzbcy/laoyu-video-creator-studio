@@ -1,1 +1,1 @@
-{"version":"2.6.0","date":"2026-08-18","notes":["整理导出升级为三件套：音乐/ + 音效/ + bgm_library.json（标签随包，ID 同步为新文件名）","新增超级导入：整包文件夹导入，标签可增量合并（不覆盖人工记录）或忽略"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
+{"version":"2.7.0","date":"2026-08-18","notes":["新增第三种类型「环境底噪」：20~60 秒自动归底噪，波形起伏大自动改判音乐，人工三态切换最终确认","分类标准升级：20 秒以下音效 / 20~60 秒环境底噪 / 60 秒以上音乐","整理导出/超级导入支持环境底噪目录"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
