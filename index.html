@@ -524,6 +524,7 @@
   <span class="spacer"></span>
   <button class="btn bouncy" id="btnAiTag" title="根据备注文本自动补标签（增量，不覆盖已有标签）">✨ 备注打标</button>
   <button class="btn bouncy" id="btnRename" title="把已打标项目在列表里的名称一键更新为标准命名（格式同整理导出；内部 ID 不变，不影响同步）">🏷️ 一键更新名称</button>
+  <button class="btn bouncy" id="btnCleanup" title="清理失效文件（本地已不存在的）+ 合并重复记录（超级导入产生的两份标签）">🧹 数据清理</button>
   <button class="btn primary bouncy" id="btnOrganize" title="把已打标文件按标准名复制到指定文件夹">📦 整理导出</button>
   <button class="btn moss bouncy" id="btnSuperImport" title="导入「整理导出」产出的完整素材包（音乐/音效/Json 三件套）">🚀 超级导入</button>
   <button class="btn bouncy" id="btnLog">📒 日志</button>
@@ -665,6 +666,15 @@
   </div>
 </dialog>
 
+<dialog id="dlgCleanup">
+  <h3><img src="assets/stickers/salute.png" alt="">🧹 数据清理体检报告</h3>
+  <p style="font-size:13.5px; line-height:1.9; margin-bottom:12px" id="cleanupPreview"></p>
+  <div class="dlgBtns">
+    <button id="cleanupCancel" class="btn bouncy">取消</button>
+    <button id="cleanupOk" class="btn primary bouncy">执行清理</button>
+  </div>
+</dialog>
+
 <dialog id="dlgOrganize">
   <h3><img src="assets/stickers/thanks.png" alt="">整理导出</h3>
   <p style="font-size:13px; line-height:1.9; margin-bottom:12px" id="orgPreview"></p>
@@ -687,7 +697,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.8.0";
+const APP_VERSION = "2.9.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -1333,10 +1343,14 @@ function renderList() {
   for (const id of ids) {
     const t = state.tracks[id];
     const div = document.createElement("div");
+    const alive = trackAlive(t);
     div.className = "track" + (id === state.current ? " current" : "");
+    if (!alive) div.style.opacity = ".45";
     const r = state.records[id];
     const preview = r ? Object.values(r.tags).flat().slice(0, 4).join("·") : "";
-    div.innerHTML = `<span class="status">${isLabeled(id) ? "✅" : "⬜"}</span>` +
+    const statusIcon = !alive ? "💤" : isLabeled(id) ? "✅" : "⬜";
+    div.title = alive ? "" : "文件不在本地（来自上次会话）：启动服务器/添加目录可恢复，或点「🧹 数据清理」移除";
+    div.innerHTML = `<span class="status">${statusIcon}</span>` +
       `<span class="kindBadge ${t.kind || "music"}">${t.kind === "sfx" ? "音效" : t.kind === "ambient" ? "底噪" : "音乐"}</span>` +
       `<span class="name">${t.displayName || t.file}</span>` +
       (preview ? `<span class="preview-tags">${preview}</span>` : "") +
@@ -1662,6 +1676,87 @@ $("btnRename").addEventListener("click", () => {
   scheduleSave("一键更新名称");
   toast(renamed ? `已把 ${renamed} 个项目更新为标准命名 🏷️（ID 不变，同步不受影响）` : "名称都是最新的，不用更新", false, "cheer.png");
 });
+
+/* ══════════════ 🧹 数据清理（失效文件 + 重复记录合并） ══════════════ */
+
+function trackAlive(t) { return !!(t && (t._file || t.url)); }
+
+// 体检：失效文件清单 + source_id 重复对
+function cleanupScan() {
+  const dead = []; // id 列表：track 无实体（本地拿不到文件）
+  for (const id of state.order) {
+    if (!trackAlive(state.tracks[id])) dead.push(id);
+  }
+  const dupPairs = []; // {keepId(哈希), dropId(新名), dropRec}
+  for (const id of state.order) {
+    const r = state.records[id];
+    if (!r || !r.source_id) continue;
+    // 有 source_id 的是「整理导出→超级导入」进来的新名记录；原哈希侧存在则为重复对
+    if (state.records[r.source_id] || state.tracks[r.source_id]) {
+      dupPairs.push({ keepId: r.source_id, dropId: id, dropRec: r });
+    }
+  }
+  return { dead, dupPairs };
+}
+
+$("btnCleanup").addEventListener("click", () => {
+  const aliveCount = state.order.filter(id => trackAlive(state.tracks[id])).length;
+  if (!state.order.length) { toast("库里还是空的，没什么可清理", false, "hmm.png"); return; }
+  if (!aliveCount) {
+    toast("当前没有可用文件（先启动服务器或添加目录），此时无法区分失效，不清理", true, "sleepy.png");
+    log("warn", "数据清理", "无存活文件，跳过（避免误清）");
+    return;
+  }
+  const { dead, dupPairs } = cleanupScan();
+  if (!dead.length && !dupPairs.length) {
+    toast("体检通过：没有失效文件，也没有重复记录 ✨", false, "love.png");
+    return;
+  }
+  $("cleanupPreview").innerHTML =
+    `检查了 <b>${state.order.length}</b> 个条目，发现：<br>` +
+    (dead.length ? `💤 <b>${dead.length}</b> 个失效文件（本地已不存在，条目和标签一并移除）<br>` : "") +
+    (dupPairs.length ? `🔀 <b>${dupPairs.length}</b> 对重复记录（超级导入产生的两份，合并成一份：标签取并集、保留原哈希条目、名称用标准名）<br>` : "") +
+    `<span style="color:var(--ink-faint);font-size:12px">合并规则：已有人工标签不动，只补缺失的；备注、时长取缺失一侧。</span>`;
+  $("dlgCleanup").showModal();
+  $("cleanupOk").onclick = () => {
+    $("dlgCleanup").close();
+    // ① 合并重复对（先做，因为要删的 dropId 可能同时也在失效清单里，先合并再清失效不冲突）
+    let merged = 0;
+    for (const p of dupPairs) {
+      const keepRec = state.records[p.keepId] || {
+        id: p.keepId, file: p.keepId, kind: p.dropRec.kind || "music",
+        duration: null, tags: {}, labeled_at: nowISO(), updated_at: nowISO(),
+      };
+      // 标签并集：keep 已有的不动，补 drop 独有的
+      for (const g in (p.dropRec.tags || {})) {
+        for (const tag of p.dropRec.tags[g]) {
+          if (!keepRec.tags[g]) keepRec.tags[g] = [];
+          if (!keepRec.tags[g].includes(tag)) keepRec.tags[g].push(tag);
+        }
+      }
+      if (!keepRec.note && p.dropRec.note) keepRec.note = p.dropRec.note;
+      if (!keepRec.duration && p.dropRec.duration) keepRec.duration = p.dropRec.duration;
+      keepRec.updated_at = nowISO();
+      state.records[p.keepId] = keepRec;
+      if (state.tracks[p.keepId]) state.tracks[p.keepId].displayName = p.dropRec.file; // 名称直接用标准名
+      delete state.records[p.dropId];
+      delete state.tracks[p.dropId];
+      merged++;
+    }
+    // ② 清失效（合并中没被涉及、仍无实体的）
+    let cleaned = 0;
+    for (const id of dead) {
+      if (!state.tracks[id]) continue; // 已在合并中删除
+      delete state.tracks[id];
+      delete state.records[id];
+      cleaned++;
+    }
+    rebuildOrder(); saveLocal(); renderAll(); scheduleSave("数据清理");
+    log("ok", "数据清理", `合并重复 ${merged} 对，清除失效 ${cleaned} 个`);
+    toast(`清理完成：合并 ${merged} 对重复，移除 ${cleaned} 个失效条目 🧹`, false, "thanks.png");
+  };
+});
+$("cleanupCancel").addEventListener("click", () => $("dlgCleanup").close());
 
 /* ══════════════ 🚀 超级导入（吃回「整理导出」三件套） ══════════════ */
 

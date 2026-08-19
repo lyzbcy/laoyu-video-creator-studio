@@ -1,1 +1,1 @@
-{"version":"2.8.0","date":"2026-08-18","notes":["新增「一键更新名称」：已打标项目在列表里一键刷新为标准命名（格式与整理导出一致），内部 ID 不变不影响同步","列表、当前播放标题、搜索均支持新名称"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
+{"version":"2.9.0","date":"2026-08-19","notes":["新增「🧹 数据清理」：一键移除失效文件条目 + 自动合并超级导入产生的重复记录（标签取并集、人工标签不动）","列表可视化失效文件（💤 半透明标识）","清理前出体检报告，无存活文件时拒绝执行避免误清"],"page":"https://lyzbcy.github.io/laoyu-tagger/","zip":"https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip"}
