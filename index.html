@@ -667,6 +667,16 @@
   </div>
 </dialog>
 
+<dialog id="dlgCacheDirs">
+  <h3><img src="assets/stickers/hmm.png" alt="">🤔 发现多个剪映缓存位置</h3>
+  <p style="font-size:13px; line-height:1.8; margin-bottom:10px" id="cdHint"></p>
+  <div id="cdList" style="max-height:240px; overflow-y:auto; font-size:13px; line-height:2.1"></div>
+  <div class="dlgBtns">
+    <button id="cdCancel" class="btn bouncy">取消</button>
+    <button id="cdOk" class="btn primary bouncy">同步勾选的位置</button>
+  </div>
+</dialog>
+
 <dialog id="dlgCleanup">
   <h3><img src="assets/stickers/salute.png" alt="">🧹 数据清理体检报告</h3>
   <p style="font-size:13.5px; line-height:1.9; margin-bottom:12px" id="cleanupPreview"></p>
@@ -702,7 +712,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.10.2";
+const APP_VERSION = "2.11.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -738,7 +748,7 @@ const NOTE_SYNONYMS = {
 
 const state = {
   groups: JSON.parse(JSON.stringify(DEFAULT_GROUPS)),
-  tracks: {},        // id -> {id, file, kind, fmt, size, duration?, url?, _file?}
+  tracks: {},        // id -> {id, file, kind, fmt, size, duration?, url?, _file?, decodeFail?}
   records: {},       // id -> {id, file, kind, duration, tags, note?, labeled_at, updated_at}
   order: [],
   current: null,
@@ -746,6 +756,7 @@ const state = {
   kindFilter: "all",
   search: "",
   tagFilter: null,
+  blocklist: [],     // 数据清理里清掉的「无法解码」条目 id，同步时跳过防复活
   handle: null,      // FileSystemFileHandle（运行时）
   lastKnownMtime: 0, // 自己写入后的 mtime，轮询时跳过
 };
@@ -852,9 +863,9 @@ function snapshot() {
   const tracks = {};
   for (const id in state.tracks) {
     const t = state.tracks[id];
-    tracks[id] = { id: t.id, file: t.file, displayName: t.displayName || null, kind: t.kind, kindSource: t.kindSource || null, waveChecked: t.waveChecked || false, fmt: t.fmt, size: t.size, duration: t.duration };
+    tracks[id] = { id: t.id, file: t.file, displayName: t.displayName || null, kind: t.kind, kindSource: t.kindSource || null, waveChecked: t.waveChecked || false, decodeFail: t.decodeFail || false, fmt: t.fmt, size: t.size, duration: t.duration };
   }
-  return { groups: state.groups, tracks, records: state.records, order: state.order, current: state.current };
+  return { groups: state.groups, tracks, records: state.records, order: state.order, current: state.current, blocklist: state.blocklist || [] };
 }
 
 function saveLocal() {
@@ -873,8 +884,9 @@ function loadLocal() {
     state.tracks = s.tracks;
     for (const id in state.tracks) if (!state.tracks[id].kind) state.tracks[id].kind = "music"; // v1 迁移
     state.records = s.records || {};
-    state.order = s.order || Object.keys(s.tracks);
+    state.order = s.order || Object.keys(state.tracks);
     state.current = s.current || null;
+    state.blocklist = Array.isArray(s.blocklist) ? s.blocklist : [];
     return true;
   } catch (e) { log("err", "恢复", "本地状态解析失败：" + e.message); return false; }
 }
@@ -1141,7 +1153,7 @@ $("btnAddSfx").addEventListener("click", () => pickDirectory("sfx"));
 /* 一键同步剪映缓存：增量导入，已导入的自动跳过 */
 $("btnSyncJy").addEventListener("click", () => {
   if (state._serverMode) {
-    syncFromServer(); // 服务器模式：直接重新拉清单，无需选目录
+    syncFromServer(false, true); // 服务器模式：重新拉清单；有多个缓存位置时让用户重新勾选
     return;
   }
   const ok = confirm(
@@ -1301,6 +1313,11 @@ async function drawWave(t) {
   } catch (e) {
     if (state.current === t.id) drawPlaceholder("波形解码失败（不影响播放）");
     log("warn", "波形", `${t.file} 解码失败：${e.message}`);
+    // 标记后「数据清理」能识别这类「文件在但浏览器解不了」的条目，勾选即可清掉
+    if (/decode|audio ?data/i.test(String(e && e.message || e))) {
+      t.decodeFail = true;
+      saveLocal();
+    }
   }
 }
 
@@ -1725,11 +1742,32 @@ $("btnRename").addEventListener("click", () => {
 
 function trackAlive(t) { return !!(t && (t._file || t.url)); }
 
-// 体检：失效文件清单 + source_id 重复对
-function cleanupScan() {
-  const dead = []; // id 列表：track 无实体（本地拿不到文件）
-  for (const id of state.order) {
-    if (!trackAlive(state.tracks[id])) dead.push(id);
+// 真实探活：_file 试着读 1 字节；url 发 HEAD。文件真没了/读不动才算失效。
+// 服务器不在线时验证不了 url，宁可放一马（返回 true），不冤枉条目
+async function probeAlive(t) {
+  if (!t) return false;
+  if (t._file) {
+    try { await t._file.slice(0, 1).arrayBuffer(); return true; } catch (e) { return false; }
+  }
+  if (t.url) {
+    if (t.url.startsWith("blob:")) return true; // 本会话的 blob 句柄，能建就能读
+    if (!state._serverMode) return true;       // 没起服务器验证不了，不当失效
+    try { const r = await fetch(t.url, { method: "HEAD" }); return r.ok; }
+    catch (e) { return true; }                 // 网络抖动 ≠ 文件没了
+  }
+  return false;
+}
+
+// 体检：真实探测每个条目（8 个一批并发）→ 失效清单 + 无法解码清单 + source_id 重复对
+async function cleanupScan() {
+  const dead = [], undecodable = [];
+  const ids = state.order.slice();
+  for (let i = 0; i < ids.length; i += 8) {
+    const results = await Promise.all(ids.slice(i, i + 8).map(async id => ({ id, alive: await probeAlive(state.tracks[id]) })));
+    for (const { id, alive } of results) {
+      if (!alive) dead.push(id);
+      else if (state.tracks[id] && state.tracks[id].decodeFail) undecodable.push(id);
+    }
   }
   const dupPairs = []; // {keepId(哈希), dropId(新名), dropRec}
   for (const id of state.order) {
@@ -1741,10 +1779,10 @@ function cleanupScan() {
       dupPairs.push({ keepId: r.source_id, dropId: id, dropRec: r });
     }
   }
-  return { dead, dupPairs };
+  return { dead, undecodable, dupPairs };
 }
 
-$("btnCleanup").addEventListener("click", () => {
+$("btnCleanup").addEventListener("click", async () => {
   const aliveCount = state.order.filter(id => trackAlive(state.tracks[id])).length;
   if (!state.order.length) { toast("库里还是空的，没什么可清理", false, "hmm.png"); return; }
   if (!aliveCount) {
@@ -1752,14 +1790,20 @@ $("btnCleanup").addEventListener("click", () => {
     log("warn", "数据清理", "无存活文件，跳过（避免误清）");
     return;
   }
-  const { dead, dupPairs } = cleanupScan();
-  if (!dead.length && !dupPairs.length) {
+  toast("体检中：逐个探测文件还在不在，稍等…", false, "cheer.png");
+  const { dead, undecodable, dupPairs } = await cleanupScan();
+  if (!dead.length && !undecodable.length && !dupPairs.length) {
     toast("体检通过：没有失效文件，也没有重复记录 ✨", false, "love.png");
     return;
   }
+  const deadLabeled = dead.filter(id => {
+    const r = state.records[id];
+    return r && (Object.values(r.tags || {}).some(a => a && a.length) || r.note);
+  }).length;
   $("cleanupPreview").innerHTML =
-    `检查了 <b>${state.order.length}</b> 个条目，发现：<br>` +
-    (dead.length ? `💤 <b>${dead.length}</b> 个失效文件（本地拿不到文件实体）：没打过标的连同条目移除；<b>打过标的保留标签</b>，等文件回来（剪映重新缓存 / 重新添加目录）自动复活<br>` : "") +
+    `检查了 <b>${state.order.length}</b> 个条目，逐个探测结果：<br>` +
+    (dead.length ? `💤 <b>${dead.length}</b> 个失效文件（文件真的拿不到了${deadLabeled ? `，其中 ${deadLabeled} 个打过标——<b>标签保留</b>，等文件回来自动复活` : "，连同条目移除"}）<br>` : "") +
+    (undecodable.length ? `🔇 <b>${undecodable.length}</b> 个文件在但浏览器解不了码（播不出、波形画不了）<label style="display:flex; gap:6px; align-items:flex-start; margin:6px 0; cursor:pointer"><input type="checkbox" id="cleanUndec" checked style="margin-top:3px"><span>把这 ${undecodable.length} 个从库里清掉（含标签；磁盘文件不动，清完不会再被同步拉回）</span></label><br>` : "") +
     (dupPairs.length ? `🔀 <b>${dupPairs.length}</b> 对重复记录（超级导入产生的两份，合并成一份：标签取并集、保留原哈希条目、名称用标准名）<br>` : "") +
     `<span style="color:var(--ink-faint);font-size:12px">合并规则：已有人工标签不动，只补缺失的；备注、时长取缺失一侧。</span>`;
   $("dlgCleanup").showModal();
@@ -1805,9 +1849,21 @@ $("btnCleanup").addEventListener("click", () => {
       delete state.records[id];
       cleaned++;
     }
+    // ③ 无法解码（文件在但播不了）：勾选才清，连记录一起，并进黑名单——
+    //    不拉黑的话下一轮同步会把它们当新文件重新加回来
+    let undecRemoved = 0;
+    if (undecodable.length && $("cleanUndec") && $("cleanUndec").checked) {
+      if (!Array.isArray(state.blocklist)) state.blocklist = [];
+      for (const id of undecodable) {
+        if (!state.blocklist.includes(id)) state.blocklist.push(id);
+        delete state.tracks[id];
+        delete state.records[id];
+        undecRemoved++;
+      }
+    }
     rebuildOrder(); saveLocal(); renderAll(); scheduleSave("数据清理");
-    log("ok", "数据清理", `合并重复 ${merged} 对，清除失效 ${cleaned} 个${keptLabeled ? `，${keptLabeled} 个打标条目保留标签待文件回归` : ""}`);
-    toast(`清理完成：合并 ${merged} 对重复，移除 ${cleaned} 个失效条目${keptLabeled ? `，${keptLabeled} 条标签已保留（文件回来即复活）` : ""} 🧹`, false, "thanks.png");
+    log("ok", "数据清理", `合并重复 ${merged} 对，清除失效 ${cleaned} 个${keptLabeled ? `，${keptLabeled} 个打标条目保留标签待文件回归` : ""}${undecRemoved ? `，清掉无法解码 ${undecRemoved} 个（已防同步复活）` : ""}`);
+    toast(`清理完成：合并 ${merged} 对重复，移除 ${cleaned} 个失效${undecRemoved ? `、${undecRemoved} 个无法解码` : ""}${keptLabeled ? `，${keptLabeled} 条标签已保留（文件回来即复活）` : ""} 🧹`, false, "thanks.png");
   };
 });
 $("cleanupCancel").addEventListener("click", () => $("dlgCleanup").close());
@@ -2154,15 +2210,66 @@ async function loadFromServer(serverBase) {
 }
 
 // 从服务器清单增量同步：只有新文件会入库，已打标签的记录永不动
-async function syncFromServer(first) {
+const LS_KEY_CACHEDIRS = "laoyu_tagger_cachedirs";
+
+// 多缓存位置选择框：返回勾选的目录路径数组，取消返回 null（defaultChecked 为预勾选）
+function pickCacheDirs(dirs, defaultChecked) {
+  return new Promise(resolve => {
+    const list = $("cdList");
+    list.innerHTML = "";
+    dirs.forEach((d, i) => {
+      const label = document.createElement("label");
+      label.style.cssText = "display:flex; gap:8px; align-items:flex-start; cursor:pointer";
+      const cb = document.createElement("input");
+      cb.type = "checkbox"; cb.checked = !defaultChecked || defaultChecked.includes(d.dir);
+      cb.style.marginTop = "6px";
+      const span = document.createElement("span");
+      span.innerHTML = `<b>${d.count}</b> 首缓存音频<br><span style="color:var(--ink-faint);font-size:12px;word-break:break-all">${d.dir}</span>`;
+      label.append(cb, span);
+      list.append(label);
+    });
+    $("cdHint").innerHTML = "你这台电脑上有 <b>" + dirs.length + "</b> 个地方存着剪映缓存（可能是改过缓存位置留下的）。<br>勾选要同步的（重复的文件会自动去重），这个选择会被记住，以后点「⤵ 一键同步」可以重选。";
+    const dlg = $("dlgCacheDirs");
+    dlg.showModal();
+    const done = val => { dlg.close(); resolve(val); };
+    $("cdOk").onclick = () => done(dirs.filter((d, i) => list.children[i].querySelector("input").checked).map(d => d.dir));
+    $("cdCancel").onclick = () => done(null);
+  });
+}
+
+async function syncFromServer(first, forceChoose = false) {
   const base = state._serverMode;
   if (!base) return;
   try {
     const r = await fetch(base + "/manifest.json", { cache: "no-store" });
     const data = await r.json();
+    // 多缓存位置：让用户勾选要同步哪些（记住上次选择；点「一键同步」可重选）
+    const allDirs = data.cacheDirs || [];
+    const withAudio = allDirs.filter(d => d.count > 0);
+    if (withAudio.length > 1) {
+      let remembered = null;
+      try { remembered = JSON.parse(localStorage.getItem(LS_KEY_CACHEDIRS) || "null"); } catch (e) {}
+      const stillValid = Array.isArray(remembered) && remembered.length &&
+        remembered.every(d => withAudio.some(x => x.dir === d));
+      if (!stillValid || forceChoose) {
+        const picked = await pickCacheDirs(withAudio, stillValid ? remembered : null);
+        if (!picked || !picked.length) {
+          log("info", "服务器同步", "用户取消了缓存位置选择，本次不同步");
+          if (forceChoose) toast("已取消，未改动同步位置", false, "hmm.png");
+          return;
+        }
+        remembered = picked;
+        localStorage.setItem(LS_KEY_CACHEDIRS, JSON.stringify(picked));
+      }
+      const okIdx = new Set(allDirs.map((d, i) => remembered.includes(d.dir) ? i : -1).filter(i => i >= 0));
+      const before = data.files.length;
+      data.files = data.files.filter(f => okIdx.has(f.dir));
+      log("info", "服务器同步", `发现 ${allDirs.length} 个缓存位置，本次同步 ${remembered.length} 个（共 ${data.files.length} 首）`);
+    }
     let added = 0, kindFixed = 0;
     for (const f of data.files || []) {
       const base2 = f.name.replace(/\.[^.]+$/, "");
+      if ((state.blocklist || []).includes(base2)) continue; // 「数据清理」清掉的无法解码条目，别再拉回来
       const url = f.url || base + "/music/" + encodeURIComponent(f.name);
       if (state.tracks[base2]) {
         const t = state.tracks[base2];

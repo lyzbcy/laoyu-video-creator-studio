@@ -9,11 +9,64 @@ const path = require("path");
 const TOOL_DIR = __dirname;
 const PORT = 8431;
 
-// 扫描目录：剪映缓存（主）+ 本地副本（兜底）。要加自己的文件夹，往这数组里添一行就行。
-const MUSIC_DIRS = [
-  path.join(process.env.LOCALAPPDATA || "", "JianyingPro", "User Data", "Cache", "music"),
-  "C:\\Users\\Administrator\\Documents\\共享\\工作\\微盛\\AI漫剧\\ai漫剧剪映工程文件\\music\\剪映本地缓存",
-].filter(d => d && fs.existsSync(d));
+// 扫描目录：自动发现，不再写死。三路探测（结果缓存 5 分钟）：
+//   1) 默认位置：%LOCALAPPDATA%\JianyingPro\User Data\Cache\music
+//   2) 工具目录旁的「剪映本地缓存」（手动整理的副本，老行为保留）
+//   3) 全盘浅扫（深度≤3、每盘≤3000 目录）：剪映里改过缓存位置的话，
+//      自选目录下会有 JianyingPro/剪映 字样的文件夹，探它下面的 User Data\Cache\music / Cache\music
+// 要手动加自己的文件夹：在 discoverMusicDirs() 末尾 found.push("你的路径") 即可。
+let _discAt = 0, _discDirs = null;
+function discoverMusicDirs() {
+  if (_discDirs && Date.now() - _discAt < 300000) return _discDirs;
+  const found = [], seen = new Set();
+  const addDir = d => {
+    if (!d) return;
+    try {
+      if (fs.statSync(d).isDirectory()) {
+        const key = path.resolve(d);
+        if (!seen.has(key)) { seen.add(key); found.push(d); }
+      }
+    } catch (e) { /* 不存在就跳过 */ }
+  };
+  addDir(path.join(process.env.LOCALAPPDATA || "", "JianyingPro", "User Data", "Cache", "music"));
+  addDir(path.join(TOOL_DIR, "剪映本地缓存"));
+  const SKIP = /^(windows|program files.*|\$recycle\.bin|system volume information|perflogs|node_modules|appdata|intel|drivers)$/i;
+  for (let c = 67; c <= 90; c++) { // C: 到 Z:（A/B 软驱不碰）
+    const root = String.fromCharCode(c) + ":\\";
+    try { fs.accessSync(root); } catch (e) { continue; }
+    addDir(path.join(root, "JianyingPro", "User Data", "Cache", "music")); // 盘根直下的快路径
+    let level = [root], visited = 0;
+    for (let depth = 0; depth < 3 && level.length && visited < 3000; depth++) {
+      const next = [];
+      for (const d of level) {
+        let names; try { names = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { continue; }
+        for (const de of names) {
+          if (!de.isDirectory() || SKIP.test(de.name)) continue;
+          if (++visited >= 3000) break;
+          const full = path.join(d, de.name);
+          if (/jianying|剪映/i.test(de.name)) {
+            addDir(path.join(full, "User Data", "Cache", "music"));
+            addDir(path.join(full, "Cache", "music"));
+          }
+          if (depth < 2) next.push(full);
+        }
+      }
+      level = next;
+    }
+  }
+  _discDirs = found; _discAt = Date.now();
+  return found;
+}
+
+// 安全解析 /music/<name>：拒绝路径穿越，返回真实存在的文件路径（跨已发现目录找）
+function resolveMusicPath(name) {
+  if (!name || /[\\/]|\.\./.test(name)) return null;
+  for (const dir of discoverMusicDirs()) {
+    const p = path.join(dir, name);
+    try { if (fs.statSync(p).isFile()) return p; } catch (e) {}
+  }
+  return null;
+}
 
 const MIME = {
   ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css",
@@ -117,10 +170,12 @@ function readAudioDuration(p, fmt, size, mtime) {
 
 function buildManifest() {
   if (manifestCache && Date.now() - manifestAt < 10000) return manifestCache;
-  const seen = new Map(); // 主文件名（去扩展名）-> {name, fmt, size, url}
-  for (const dir of MUSIC_DIRS) {
+  const dirs = discoverMusicDirs();
+  const seen = new Map(); // 主文件名（去扩展名）-> {name, fmt, size, url, dir}
+  const counts = dirs.map(() => 0);
+  dirs.forEach((dir, di) => {
     let files;
-    try { files = fs.readdirSync(dir); } catch (e) { continue; }
+    try { files = fs.readdirSync(dir); } catch (e) { return; }
     for (const f of files) {
       const m = /\.(mp3|m4a|wav|ogg|flac)$/i.exec(f);
       if (!m) continue;
@@ -129,6 +184,7 @@ function buildManifest() {
       const p = path.join(dir, f);
       try {
         const st = fs.statSync(p);
+        counts[di]++;
         const fmt = sniffFmt(p, m[1].toLowerCase());
         seen.set(base, {
           name: f,
@@ -137,11 +193,15 @@ function buildManifest() {
           duration: readAudioDuration(p, fmt, st.size, st.mtimeMs), // 秒；供前端自动分类音乐/音效
           kind: "music",
           url: "/music/" + encodeURIComponent(f),
+          dir: di, // 来自哪个缓存目录（前端多位置选择用）
         });
       } catch (e) { /* 文件被剪映删了一半之类，跳过 */ }
     }
-  }
-  manifestCache = JSON.stringify({ files: [...seen.values()] });
+  });
+  manifestCache = JSON.stringify({
+    cacheDirs: dirs.map((d, i) => ({ dir: d, count: counts[i] })), // 各缓存位置及音频数（前端选择框用）
+    files: [...seen.values()],
+  });
   manifestAt = Date.now();
   return manifestCache;
 }
@@ -212,11 +272,14 @@ const server = http.createServer((req, res) => {  try {
       handleSelfUpdate(req, res);
       return;
     } else if (pathname.startsWith("/music/")) {
-      const name = pathname.slice(7);
-      for (const dir of MUSIC_DIRS) {
-        const p = path.join(dir, name);
-        if (fs.existsSync(p)) { filePath = p; break; }
+      // HEAD：前端「数据清理」用它探活（文件还在不在），只回头不带体
+      if (req.method === "HEAD") {
+        const p = resolveMusicPath(pathname.slice(7));
+        if (!p) { res.writeHead(404); res.end(); return; }
+        res.writeHead(200, { "Content-Length": fs.statSync(p).size });
+        res.end(); return;
       }
+      filePath = resolveMusicPath(pathname.slice(7));
     }
     if (!filePath || !fs.existsSync(filePath) || !filePath.startsWith(TOOL_DIR) && !filePath.includes("music")) {
       res.writeHead(404); res.end("not found"); return;
@@ -266,8 +329,8 @@ server.on("error", err => {
 server.listen(PORT, "127.0.0.1", () => {
   const url = `http://127.0.0.1:${PORT}/?server=http://127.0.0.1:${PORT}`;
   console.log("捞鱼打标工具已启动：" + url);
-  console.log("监控目录：");
-  MUSIC_DIRS.forEach(d => console.log("  - " + d));
+  console.log("监控目录（自动发现，含剪映自定义缓存位置，5 分钟重扫一次）：");
+  discoverMusicDirs().forEach(d => console.log("  - " + d));
   console.log("剪映里新缓存的音乐，最迟 10 秒后自动出现在工具里（页面开着每分钟自动同步，重开页面立即同步）。");
   console.log("关掉这个黑窗口 = 关闭工具服务器。");
   // 自动打开浏览器
