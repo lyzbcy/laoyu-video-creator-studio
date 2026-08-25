@@ -124,7 +124,7 @@
     <a class="btn primary" id="heroDl" href="#">📦 下载 Windows 版</a>
     <a class="btn ghost" href="#quick">查看上手方法</a>
   </div>
-  <p class="meta" id="verMeta">当前版本 v2.3.0 · 适配 Windows（Mac 版在路上）· 需要已安装 Node.js</p>
+  <p class="meta" id="verMeta">当前版本 v2.3.0 · 适配 Windows（Mac 版在路上）· 没装 Node.js 也能启动，启动器会自动安装</p>
 </header>
 
 <section id="features" class="wrap">
@@ -211,7 +211,7 @@ fetch("version.json", { cache: "no-store" })
   .then(r => r.json())
   .then(v => {
     document.getElementById("verMeta").textContent =
-      `当前版本 v${v.version} · 适配 Windows（Mac 版在路上）· 需要已安装 Node.js`;
+      `当前版本 v${v.version} · 适配 Windows（Mac 版在路上）· 没装 Node.js 也能启动，启动器会自动安装`;
     document.getElementById("demoVer").textContent = v.version;
     document.title = `捞鱼打标工具 v${v.version} — BGM/音效边听边打标小铺`;
   })
