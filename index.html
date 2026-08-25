@@ -439,7 +439,7 @@
     margin-bottom: 14px;
   }
   dialog input:focus { outline: none; border-color: var(--tang); }
-  dialog .dlgBtns { display: flex; gap: 8px; justify-content: flex-end; }
+  dialog .dlgBtns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
   /* 贴纸选择器 */
   #stickerGrid { display: flex; flex-wrap: wrap; gap: 10px; max-width: 420px; max-height: 320px; overflow-y: auto; padding: 4px; }
@@ -663,6 +663,7 @@
     <button id="siCancel" class="btn bouncy">取消整个导入</button>
     <button id="siIgnore" class="btn bouncy">只用当前库</button>
     <button id="siMerge" class="btn primary bouncy">增量合并进来</button>
+    <button id="siReplace" class="btn moss bouncy">用包重建库</button>
   </div>
 </dialog>
 
@@ -678,6 +679,10 @@
 <dialog id="dlgOrganize">
   <h3><img src="assets/stickers/thanks.png" alt="">整理导出</h3>
   <p style="font-size:13px; line-height:1.9; margin-bottom:12px" id="orgPreview"></p>
+  <label style="display:flex; gap:8px; align-items:flex-start; font-size:13px; margin-bottom:12px; cursor:pointer; line-height:1.6">
+    <input type="checkbox" id="orgClean" checked style="margin-top:2px">
+    <span>🧹 顺手清掉目标文件夹里<b>本次没导出</b>的旧音频（标签改了名、历史遗留的旧文件，防止越导越多）</span>
+  </label>
   <div class="dlgBtns">
     <button id="orgCancel" class="btn bouncy">取消</button>
     <button id="orgOk" class="btn primary bouncy">选择文件夹并导出</button>
@@ -697,7 +702,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.9.0";
+const APP_VERSION = "2.10.1";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -1564,20 +1569,39 @@ $("btnAiTag").addEventListener("click", () => {
 
 /* ══════════════ 📦 整理导出（统一重命名） ══════════════ */
 
+const HEX32 = /^[0-9a-f]{32}$/;
+
+/* 溯源到素材的原始哈希。正常条目 r.id 就是剪映缓存的 32 位 md5；
+   「整理导出→超级导入」进来的旧条目 id 是导出文件名，真哈希藏在 source_id 链上，
+   顺着链往上找（最多 5 层，防环）。实在修不出来的返回 null，调用方各自兜底。 */
+function hashKeyFor(r) {
+  let cur = r, depth = 0;
+  while (cur && depth++ < 5) {
+    if (HEX32.test(cur.id || "")) return cur.id;
+    const sid = cur.source_id || "";
+    if (HEX32.test(sid)) return sid;
+    cur = state.records[sid];
+  }
+  const m = (r.id || "").match(/_([0-9a-f]{8})$/); // 一代导出名「显示名_哈希前8」兜底
+  return m ? m[1] : null;
+}
+
 function stdNameFor(r, t) {
   const parts = [];
   for (const g of state.groups) {
     const tags = (r.tags && r.tags[g.name] || []).filter(Boolean);
     if (tags.length) parts.push(tags.join("·"));
   }
-  const hash8 = r.id.slice(0, 8);
+  // 哈希后缀只认溯源结果；溯源失败的旧脏数据取末段兜底，绝不再拿文件名切片自我复制
+  const key = hashKeyFor(r);
+  const hash8 = key ? key.slice(0, 8) : ((r.id || "").split("_").pop() || "x").slice(-8);
   const ext = (t && t.file.match(/\.[^.]+$/)?.[0]) || ".mp3";
   if (parts.length) return parts.join("-") + "_" + hash8 + ext;
   if (r.note) {
     const snippet = r.note.slice(0, 12).replace(/[\\/:*?"<>|]/g, "");
     return `备注-${snippet}_${hash8}${ext}`;
   }
-  return r.id + ext;
+  return (key || r.id) + ext;
 }
 
 $("btnOrganize").addEventListener("click", async () => {
@@ -1599,8 +1623,9 @@ $("btnOrganize").addEventListener("click", async () => {
     let outDir;
     try { outDir = await window.showDirectoryPicker({ mode: "readwrite" }); }
     catch (e) { return; }
-    let ok = 0, skip = 0, fail = 0;
+    let ok = 0, skip = 0, fail = 0, dupRec = 0;
     const exportRecords = []; // 随包导出的标签数据（ID=新名，source_id 溯源）
+    const writtenNames = new Set(); // 本次实际落盘的文件名（供清理旧文件用）
     const dirByKind = {
       music: await outDir.getDirectoryHandle("音乐", { create: true }),
       sfx: await outDir.getDirectoryHandle("音效", { create: true }),
@@ -1612,6 +1637,7 @@ $("btnOrganize").addEventListener("click", async () => {
       const kind = r.kind || "music";
       const dir = dirByKind[kind];
       const name = stdNameFor(r, t);
+      writtenNames.add(name);
       try {
         const fh = await dir.getFileHandle(name, { create: true });
         const existing = await fh.getFile();
@@ -1624,16 +1650,34 @@ $("btnOrganize").addEventListener("click", async () => {
           ok++;
         }
         // 无论新写还是已存在，都把标签数据记进导出包（ID 对齐重命名后的新文件名）
-        exportRecords.push({
-          id: name.replace(/\.[^.]+$/, ""),
-          file: name,
-          kind,
-          duration: r.duration || t.duration || null,
-          tags: r.tags || {},
-          note: r.note,
-          source_id: r.id, // 原剪映哈希名，溯源用
-        });
+        const stem = name.replace(/\.[^.]+$/, "");
+        if (exportRecords.some(e => e.id === stem)) {
+          dupRec++; // 同一素材多条记录（历史上重复打标），只留一条随包
+        } else {
+          exportRecords.push({
+            id: stem,
+            file: name,
+            kind,
+            duration: r.duration || t.duration || null,
+            tags: r.tags || {},
+            note: r.note,
+            source_id: hashKeyFor(r) || r.id, // 溯源到原哈希，超级导入按它还原身份
+          });
+        }
       } catch (e) { fail++; log("err", "整理导出", `${name} 失败：${e.message}`); }
+    }
+    // 清理旧文件：只动三个分类子目录里的音频，本次清单内的和 json 一律不碰
+    let cleanedOld = 0;
+    if ($("orgClean").checked) {
+      const audioRe = /\.(mp3|m4a|wav|ogg|flac|aac)$/i;
+      for (const dir of Object.values(dirByKind)) {
+        for await (const [fname, h] of dir.entries()) {
+          if (h.kind === "file" && audioRe.test(fname) && !writtenNames.has(fname)) {
+            try { await dir.removeEntry(fname); cleanedOld++; }
+            catch (e) { log("warn", "整理导出", `旧文件 ${fname} 删除失败：${e.message}`); }
+          }
+        }
+      }
     }
     // 写 bgm_library.json（三件套的最后一件）
     let jsonOk = false;
@@ -1641,14 +1685,14 @@ $("btnOrganize").addEventListener("click", async () => {
       const jh = await outDir.getFileHandle("bgm_library.json", { create: true });
       const jw = await jh.createWritable();
       await jw.write(JSON.stringify({
-        _meta: { app: "捞鱼打标工具", format: "organize-export", version: 1, exported_at: nowISO(), count: exportRecords.length },
+        _meta: { app: "捞鱼打标工具", format: "organize-export", version: 2, exported_at: nowISO(), count: exportRecords.length },
         records: exportRecords,
       }, null, 2));
       await jw.close();
       jsonOk = true;
     } catch (e) { log("err", "整理导出", "bgm_library.json 写入失败：" + e.message); }
-    log("ok", "整理导出", `音频 ${ok} 新写 / ${skip} 跳过 / ${fail} 失败；json ${jsonOk ? exportRecords.length + " 条" : "失败"} → ${outDir.name}`);
-    toast(`整理完成！${ok} 首 + 标签数据${jsonOk ? "（json）" : "（json 失败）"}${skip ? `，跳过 ${skip}` : ""}${fail ? `，失败 ${fail}（见日志）` : ""}`, fail > 0 || !jsonOk, "thanks.png");
+    log("ok", "整理导出", `音频 ${ok} 新写 / ${skip} 跳过 / ${fail} 失败；旧文件清理 ${cleanedOld}${dupRec ? `；合并同名记录 ${dupRec}` : ""}；json ${jsonOk ? exportRecords.length + " 条" : "失败"} → ${outDir.name}`);
+    toast(`整理完成！${ok} 首 + 标签数据${jsonOk ? "（json）" : "（json 失败）"}${skip ? `，跳过 ${skip}` : ""}${cleanedOld ? `，清旧 ${cleanedOld}` : ""}${fail ? `，失败 ${fail}（见日志）` : ""}`, fail > 0 || !jsonOk, "thanks.png");
   };
 });
 $("orgCancel").addEventListener("click", () => $("dlgOrganize").close());
@@ -1690,7 +1734,8 @@ function cleanupScan() {
   const dupPairs = []; // {keepId(哈希), dropId(新名), dropRec}
   for (const id of state.order) {
     const r = state.records[id];
-    if (!r || !r.source_id) continue;
+    // source_id 指向自己 = 已还原到原哈希的正常条目，不是重复（自配对会把自己删掉）
+    if (!r || !r.source_id || r.source_id === id) continue;
     // 有 source_id 的是「整理导出→超级导入」进来的新名记录；原哈希侧存在则为重复对
     if (state.records[r.source_id] || state.tracks[r.source_id]) {
       dupPairs.push({ keepId: r.source_id, dropId: id, dropRec: r });
@@ -1714,7 +1759,7 @@ $("btnCleanup").addEventListener("click", () => {
   }
   $("cleanupPreview").innerHTML =
     `检查了 <b>${state.order.length}</b> 个条目，发现：<br>` +
-    (dead.length ? `💤 <b>${dead.length}</b> 个失效文件（本地已不存在，条目和标签一并移除）<br>` : "") +
+    (dead.length ? `💤 <b>${dead.length}</b> 个失效文件（本地拿不到文件实体）：没打过标的连同条目移除；<b>打过标的保留标签</b>，等文件回来（剪映重新缓存 / 重新添加目录）自动复活<br>` : "") +
     (dupPairs.length ? `🔀 <b>${dupPairs.length}</b> 对重复记录（超级导入产生的两份，合并成一份：标签取并集、保留原哈希条目、名称用标准名）<br>` : "") +
     `<span style="color:var(--ink-faint);font-size:12px">合并规则：已有人工标签不动，只补缺失的；备注、时长取缺失一侧。</span>`;
   $("dlgCleanup").showModal();
@@ -1743,17 +1788,26 @@ $("btnCleanup").addEventListener("click", () => {
       delete state.tracks[p.dropId];
       merged++;
     }
-    // ② 清失效（合并中没被涉及、仍无实体的）
-    let cleaned = 0;
+    // ② 清失效（合并中没被涉及、仍无实体的）。
+    //    打过标的（有标签或有备注）只清文件实体、保留记录——失效多半是暂时的
+    //    （页面刷新丢了句柄 / 剪映缓存轮换），标签是人打的，不能跟着文件陪葬
+    let cleaned = 0, keptLabeled = 0;
     for (const id of dead) {
       if (!state.tracks[id]) continue; // 已在合并中删除
+      const r = state.records[id];
+      const labeled = r && (Object.values(r.tags || {}).some(a => a && a.length) || r.note);
+      if (labeled) {
+        state.tracks[id]._file = null; state.tracks[id].url = null; // 明确标记失效（💤），等文件回归
+        keptLabeled++;
+        continue;
+      }
       delete state.tracks[id];
       delete state.records[id];
       cleaned++;
     }
     rebuildOrder(); saveLocal(); renderAll(); scheduleSave("数据清理");
-    log("ok", "数据清理", `合并重复 ${merged} 对，清除失效 ${cleaned} 个`);
-    toast(`清理完成：合并 ${merged} 对重复，移除 ${cleaned} 个失效条目 🧹`, false, "thanks.png");
+    log("ok", "数据清理", `合并重复 ${merged} 对，清除失效 ${cleaned} 个${keptLabeled ? `，${keptLabeled} 个打标条目保留标签待文件回归` : ""}`);
+    toast(`清理完成：合并 ${merged} 对重复，移除 ${cleaned} 个失效条目${keptLabeled ? `，${keptLabeled} 条标签已保留（文件回来即复活）` : ""} 🧹`, false, "thanks.png");
   };
 });
 $("cleanupCancel").addEventListener("click", () => $("dlgCleanup").close());
@@ -1841,40 +1895,85 @@ async function superImport(fileList) {
     toast("音频已入库，但 Json 不是整理导出格式，标签数据没导入", true, "hmm.png");
     return;
   }
+  // 2.5 身份还原：导出包里的音频 id 是标准文件名，真正的身份是 source_id 指向的原哈希。
+  //     把 track 挂回原哈希，之后无论反复「导出→超级导入」多少轮，导出名都稳定不套娃。
+  //     原哈希侧已在库里的，只把包里的文件实体补给它，不重复入库（导入幂等）。
+  let restored = 0;
+  for (const r of recs) {
+    if (!r || !HEX32.test(r.source_id || "")) continue;
+    const stem = (r.file || r.id).replace(/\.[^.]+$/, "");
+    const t = state.tracks[stem];
+    if (!t || r.source_id === stem) continue;
+    const home = state.tracks[r.source_id];
+    if (home) {
+      if (!home._file && !home.url) { home._file = t._file; home.url = null; }
+    } else {
+      t.id = r.source_id;
+      state.tracks[r.source_id] = t;
+    }
+    delete state.tracks[stem];
+    restored++;
+  }
+  if (restored) { rebuildOrder(); saveLocal(); renderAll(); }
   $("siPreview").innerHTML =
     `素材包里有 <b>${recs.length}</b> 条标签数据（${jsonFile.name}）。<br>` +
     `音频部分已入库：🎵 ${addedM} + 🔊 ${addedS} + 🌫️ ${addedA}${dup ? `（重复 ${dup} 跳过）` : ""}。<br><br>` +
+    `<b>用包重建库</b>：抛弃当前库的标签，以这份 Json 为准（清理历史坏数据用这个）<br>` +
     `<b>增量合并</b>：把标签并进当前打开的库（已有人工记录不覆盖）<br>` +
     `<b>只用当前库</b>：忽略包里的 Json，音频当白板从头打标`;
   const dlg = $("dlgSuperImport");
   dlg.showModal();
+  const buildRec = r => { // 记录挂回原哈希，与 track 同 id
+    const rid = HEX32.test(r.source_id || "") ? r.source_id : r.id;
+    return [rid, {
+      id: rid, file: r.file || rid,
+      kind: r.kind || "music",
+      duration: r.duration || null,
+      tags: r.tags || {}, note: r.note,
+      source_id: r.source_id,
+      labeled_at: nowISO(), updated_at: nowISO(),
+    }];
+  };
   const finish = how => {
     dlg.close();
     if (how === "merge") {
       let merged = 0, kept = 0;
       for (const r of recs) {
         if (!r || !r.id) continue;
-        if (state.records[r.id]) { kept++; continue; } // 已有记录人工优先，不覆盖
-        state.records[r.id] = {
-          id: r.id, file: r.file || r.id,
-          kind: r.kind || "music",
-          duration: r.duration || null,
-          tags: r.tags || {}, note: r.note,
-          source_id: r.source_id,
-          labeled_at: nowISO(), updated_at: nowISO(),
-        };
+        const [rid, rec] = buildRec(r);
+        if (state.records[rid]) { kept++; continue; } // 已有记录人工优先，不覆盖
+        state.records[rid] = rec;
         merged++;
       }
-      log("ok", "超级导入", `标签合并：新增 ${merged} 条，保留已有 ${kept} 条`);
-      toast(`标签已合并：新增 ${merged} 条${kept ? `，${kept} 条已有记录未动` : ""}`, false, "thanks.png");
+      log("ok", "超级导入", `标签合并：新增 ${merged} 条，保留已有 ${kept} 条${restored ? `；身份还原 ${restored} 条挂回原哈希` : ""}`);
+      toast(`标签已合并：新增 ${merged} 条${kept ? `，${kept} 条已有记录未动` : ""}${restored ? `，${restored} 条身份已还原` : ""}`, false, "thanks.png");
+    } else if (how === "replace") {
+      const oldCount = Object.keys(state.records).length;
+      const next = {};
+      for (const r of recs) {
+        if (!r || !r.id) continue;
+        const [rid, rec] = buildRec(r);
+        next[rid] = rec; // 同 id 的以包内最后一条为准
+      }
+      state.records = next;
+      // 连带清掉历史遗留的文件名条目（id 不是原哈希、新记录里也没有的 track）；
+      // 剪映缓存同步来的原生哈希条目保留，下一轮同步自动对上，不受影响
+      let pruned = 0;
+      for (const id of Object.keys(state.tracks)) {
+        if (!HEX32.test(id) && !state.records[id]) { delete state.tracks[id]; pruned++; }
+      }
+      const n = Object.keys(state.records).length;
+      log("ok", "超级导入", `已用包内数据重建标签库：${n} 条（旧库 ${oldCount} 条作废；清理遗留条目 ${pruned} 个）${restored ? `；身份还原 ${restored} 条挂回原哈希` : ""}`);
+      toast(`库已按素材包重建：${n} 条标签，旧库 ${oldCount} 条已作废`, false, "cheer.png");
     } else {
       log("info", "超级导入", "按用户选择忽略包内 Json，仅音频入库");
       toast("已忽略包里的 Json，用当前库继续", false, "hmm.png");
     }
     rebuildOrder(); scheduleSave("超级导入"); renderAll();
-    if (!state.current) playFirstVisible();
+    if (!state.current || !state.tracks[state.current]) playFirstVisible(); // 重建后当前条目可能已被清掉
   };
   $("siMerge").onclick = () => finish("merge");
+  $("siReplace").onclick = () => finish("replace");
   $("siIgnore").onclick = () => finish("ignore");
   $("siCancel").onclick = () => { dlg.close(); log("warn", "超级导入", "用户取消（音频已入库）"); };
 }
