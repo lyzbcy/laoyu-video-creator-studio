@@ -16,6 +16,21 @@ const PORT = 8431;
 //      自选目录下会有 JianyingPro/剪映 字样的文件夹，探它下面的 User Data\Cache\music / Cache\music
 // 要手动加自己的文件夹：在 discoverMusicDirs() 末尾 found.push("你的路径") 即可。
 let _discAt = 0, _discDirs = null;
+// 本地固定盘列表（DriveType=3），进程内只查一次。网络映射盘/光驱的同步 IO
+// 可能一卡几十秒，全盘浅扫必须绕开它们；查询失败时保守只扫 C:
+let _fixedDrives = null;
+function fixedDrives() {
+  if (_fixedDrives) return _fixedDrives;
+  try {
+    const out = require("child_process").execSync(
+      "powershell -NoProfile -Command \"(Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3').DeviceID\"",
+      { timeout: 8000, windowsHide: true }).toString();
+    const ds = out.match(/[A-Z]:/g);
+    if (ds && ds.length) { _fixedDrives = ds.map(d => d + "\\"); return _fixedDrives; }
+  } catch (e) { /* 查询失败走兜底 */ }
+  _fixedDrives = ["C:\\"];
+  return _fixedDrives;
+}
 function discoverMusicDirs() {
   if (_discDirs && Date.now() - _discAt < 300000) return _discDirs;
   const found = [], seen = new Set();
@@ -31,8 +46,7 @@ function discoverMusicDirs() {
   addDir(path.join(process.env.LOCALAPPDATA || "", "JianyingPro", "User Data", "Cache", "music"));
   addDir(path.join(TOOL_DIR, "剪映本地缓存"));
   const SKIP = /^(windows|program files.*|\$recycle\.bin|system volume information|perflogs|node_modules|appdata|intel|drivers)$/i;
-  for (let c = 67; c <= 90; c++) { // C: 到 Z:（A/B 软驱不碰）
-    const root = String.fromCharCode(c) + ":\\";
+  for (const root of fixedDrives()) { // 只扫本地固定盘，网络盘/光驱不碰
     try { fs.accessSync(root); } catch (e) { continue; }
     addDir(path.join(root, "JianyingPro", "User Data", "Cache", "music")); // 盘根直下的快路径
     let level = [root], visited = 0;
@@ -248,8 +262,16 @@ Write-Output 'LAOYU_UPDATE_OK'
         if (err || !String(stdout).includes("LAOYU_UPDATE_OK")) {
           reply({ ok: false, error: (err ? err.message : stdout || "更新脚本异常").slice(0, 200) });
         } else {
-          console.log("已一键更新到 v" + v.version + "（工具文件已替换，运行中的服务沿用旧代码，重启后完全生效）");
-          reply({ ok: true, version: v.version });
+          console.log("已一键更新到 v" + v.version + "，服务器 3 秒后自动重启加载新代码…");
+          reply({ ok: true, version: v.version, restart: true });
+          // 自我重启：脱离的子进程等旧进程退出后重新拉起服务器（新代码从磁盘加载）。
+          // 新窗口照常自动打开工具页，老黑窗口会自然关闭。
+          const { spawn } = require("child_process");
+          const relaunch = spawn("cmd.exe",
+            ["/c", `timeout /t 3 >nul & cd /d "${TOOL_DIR}" & node sync-server.js`],
+            { detached: true, stdio: "ignore", windowsHide: false });
+          relaunch.unref();
+          setTimeout(() => process.exit(0), 800);
         }
       });
   } catch (e) {

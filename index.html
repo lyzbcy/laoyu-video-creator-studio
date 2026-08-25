@@ -712,7 +712,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.11.0";
+const APP_VERSION = "2.11.1";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -2298,6 +2298,10 @@ async function syncFromServer(first, forceChoose = false) {
       toast(`剪映缓存有新增，自动加了 ${added} 首 🎉`, false, "cheer.png");
     } else if (kindFixed) {
       log("info", "自动同步", `按时长补判 ${kindFixed} 首的类型`);
+    } else if (forceChoose) {
+      // 用户主动点了「一键同步」却啥也没发生，容易以为功能坏了——给句明确反馈
+      log("info", "自动同步", "已重新同步，没有新缓存的音频");
+      toast("已重新同步：没有发现新缓存的音频", false, "hmm.png");
     }
     return added;
   } catch (e) {
@@ -2353,10 +2357,24 @@ $("btnUpdateNow").addEventListener("click", async () => {
     const r = await fetch("/self-update", { cache: "no-store" });
     const res = await r.json();
     if (res.ok) {
-      toast(`已更新到 v${res.version}，页面即将刷新`, false, "thanks.png");
       localStorage.removeItem(LS_KEY_SKIPVER);
-      log("ok", "一键更新", `成功更新到 v${res.version}`);
-      setTimeout(() => location.reload(), 1400);
+      log("ok", "一键更新", `成功更新到 v${res.version}${res.restart ? "，服务器自动重启中" : ""}`);
+      if (res.restart) {
+        toast(`已更新到 v${res.version}！服务器正在自动重启，页面稍后自动刷新`, false, "cheer.png");
+        // 等服务器重启完成再刷新（轮询清单接口，最多等 30 秒）
+        const waitUp = async () => {
+          for (let i = 0; i < 30; i++) {
+            await new Promise(rs => setTimeout(rs, 1000));
+            try { await fetch("/manifest.json", { cache: "no-store" }); location.reload(); return; } catch (e) {}
+          }
+          toast("服务器等半天没起来：双击「启动打标工具.bat」手动启动，或去发布页重新下载", true);
+          window.open("https://lyzbcy.github.io/laoyu-tagger/?dl=1", "_blank");
+        };
+        waitUp();
+      } else {
+        toast(`已更新到 v${res.version}，页面即将刷新`, false, "thanks.png");
+        setTimeout(() => location.reload(), 1400);
+      }
     } else {
       throw new Error(res.error || "未知失败");
     }
