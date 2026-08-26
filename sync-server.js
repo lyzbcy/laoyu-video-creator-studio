@@ -220,6 +220,63 @@ function buildManifest() {
   return manifestCache;
 }
 
+/* ── 反馈区：把同事在工具里写的问题一键转发到企微群机器人 ──────────────
+   webhook 从哪拿：反馈群 → 群设置 → 添加群机器人 → 复制 Webhook 地址
+   三种配置方式（优先级从高到低）：
+     1. 环境变量 LAOYU_FEEDBACK_WEBHOOK（临时测试用）
+     2. 工具目录下 feedback-webhook.txt（一行 URL，不改编码就能换）
+     3. 下面的常量（随版本发布，同事开箱即用；注意仓库是公开的，
+        建议用专门的反馈群，被陌生人滥用最多就是群里多几条消息，随时可换 key） */
+const FEEDBACK_WEBHOOK = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=1d51b768-913e-4374-93c5-d0f57d025241";
+function feedbackWebhook() {
+  if (process.env.LAOYU_FEEDBACK_WEBHOOK) return process.env.LAOYU_FEEDBACK_WEBHOOK.trim();
+  try {
+    const f = path.join(TOOL_DIR, "feedback-webhook.txt");
+    if (fs.existsSync(f)) {
+      const u = fs.readFileSync(f, "utf8").trim();
+      if (u) return u;
+    }
+  } catch (e) {}
+  return FEEDBACK_WEBHOOK.trim();
+}
+let _lastFeedbackAt = 0; // 同实例至少间隔 10 秒一条，防手滑连点刷屏
+async function handleFeedback(req, res) {
+  const reply = obj => res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify(obj));
+  try {
+    const chunks = [];
+    for await (const c of req) chunks.push(c);
+    const body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
+    const text = String(body.text || "").trim().slice(0, 3500);
+    const contact = String(body.contact || "").trim().slice(0, 100);
+    const version = String(body.version || "").trim().slice(0, 30);
+    if (!text) { reply({ ok: false, error: "反馈内容是空的" }); return; }
+    const hook = feedbackWebhook();
+    if (!hook) { reply({ ok: false, unconfigured: true, error: "反馈机器人还没配置" }); return; }
+    if (Date.now() - _lastFeedbackAt < 10000) { reply({ ok: false, error: "发得太快啦，歇 10 秒再发～" }); return; }
+    const content = [
+      "🐟 捞鱼打标工具 · 新反馈",
+      "────────────",
+      text,
+      "",
+      "👤 联系方式：" + (contact || "没留"),
+      version ? "🏷 工具版本：v" + version : "",
+      "🕐 " + new Date().toLocaleString("zh-CN", { hour12: false })
+    ].filter(Boolean).join("\n");
+    const r = await fetch(hook, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ msgtype: "text", text: { content: content.slice(0, 4000) } }) // 企微 text 上限 4096 字节
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.errcode !== 0) { reply({ ok: false, error: "机器人接口返回异常(" + r.status + " " + (j.errmsg || "") + ")" }); return; }
+    _lastFeedbackAt = Date.now();
+    console.log("收到一条工具反馈（已转发到企微群）");
+    reply({ ok: true });
+  } catch (e) {
+    reply({ ok: false, error: String(e.message || e).slice(0, 200) });
+  }
+}
+
 /* ── 一键更新：下载发布 zip → 解压 → 覆盖工具文件（保留用户数据） ─────────
    用 PowerShell 干活（Windows 自带）；zip 下载先走原站，失败换 gh-proxy 镜像。 */
 async function handleSelfUpdate(req, res) {
@@ -292,6 +349,10 @@ const server = http.createServer((req, res) => {  try {
       return;
     } else if (pathname === "/self-update") {
       handleSelfUpdate(req, res);
+      return;
+    } else if (pathname === "/feedback") {
+      if (req.method !== "POST") { res.writeHead(405); res.end(); return; }
+      handleFeedback(req, res);
       return;
     } else if (pathname.startsWith("/music/")) {
       // HEAD：前端「数据清理」用它探活（文件还在不在），只回头不带体

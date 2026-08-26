@@ -439,6 +439,22 @@
     margin-bottom: 14px;
   }
   dialog input:focus { outline: none; border-color: var(--tang); }
+  dialog textarea {
+    width: 100%;
+    min-width: 340px;
+    min-height: 110px;
+    background: var(--paper-2);
+    border: 2px solid var(--border-strong);
+    border-radius: 12px;
+    color: var(--ink);
+    padding: 8px 11px;
+    font-size: 13px;
+    font-family: inherit;
+    line-height: 1.7;
+    resize: vertical;
+    margin-bottom: 14px;
+  }
+  dialog textarea:focus { outline: none; border-color: var(--tang); }
   dialog .dlgBtns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 
   /* 贴纸选择器 */
@@ -527,6 +543,7 @@
   <button class="btn bouncy" id="btnCleanup" title="清理失效文件（本地已不存在的）+ 合并重复记录（超级导入产生的两份标签）">🧹 数据清理</button>
   <button class="btn primary bouncy" id="btnOrganize" title="把已打标文件按标准名复制到指定文件夹">📦 整理导出</button>
   <button class="btn moss bouncy" id="btnSuperImport" title="导入「整理导出」产出的完整素材包（音乐/音效/Json 三件套）">🚀 超级导入</button>
+  <button class="btn bouncy" id="btnFeedback" title="用着不顺手、有想法，直接写给捞鱼——点一下就送达">💬 反馈</button>
   <button class="btn bouncy" id="btnLog">📒 日志</button>
   <button class="btn bouncy" id="btnImport">导入</button>
   <button class="btn bouncy" id="btnExport">导出</button>
@@ -656,6 +673,23 @@
   </div>
 </dialog>
 
+<dialog id="dlgFeedback">
+  <h3><img src="assets/stickers/wah.png" alt="">💬 给捞鱼提反馈</h3>
+  <p style="font-size:12.5px; color:var(--ink-faint); margin-bottom:10px; line-height:1.7">
+    哪里用着不顺手、想要什么功能、碰到什么问题，写下来点发送就到捞鱼那边了，不用跳转、不用登录。
+  </p>
+  <textarea id="fbText" placeholder="比如：希望支持 Mac 版 / 导出想按日期分组 / 今天同步剪映缓存时卡住了……"></textarea>
+  <input type="text" id="fbContact" placeholder="怎么找到你（选填）：名字 / 工位 / 企微号">
+  <p id="fbFallback" style="display:none; font-size:12.5px; color:var(--ink-soft); margin:0 0 10px; line-height:1.7">
+    机器人通道没通（可能还没配置），走 GitHub 也行：
+    <a href="#" id="fbGhLink" target="_blank" rel="noopener" style="color:var(--tang)">帮我打开反馈页</a>（内容已带好，登录后点 Submit）
+  </p>
+  <div class="dlgBtns">
+    <button id="fbClose" class="btn bouncy">关闭</button>
+    <button id="fbSend" class="btn primary bouncy">🚀 一键发送</button>
+  </div>
+</dialog>
+
 <dialog id="dlgSuperImport">
   <h3><img src="assets/stickers/love.png" alt="">🚀 超级导入 — 发现标签数据</h3>
   <p style="font-size:13.5px; line-height:1.9; margin-bottom:12px" id="siPreview"></p>
@@ -712,7 +746,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.11.1";
+const APP_VERSION = "2.11.2";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -824,6 +858,55 @@ function toast(msg, isErr, sticker) {
 }
 
 function nowISO() { return new Date().toISOString(); }
+
+/* ══════════════ 反馈区：一键发到捞鱼的企微反馈群 ══════════════ */
+
+function showFbFallback(text, contact) {
+  // 机器人通道没通时的兜底：把内容预填到 GitHub Issue，同事点 Submit 即可
+  $("fbGhLink").href = "https://github.com/lyzbcy/laoyu-tagger/issues/new" +
+    "?title=" + encodeURIComponent("[工具反馈] " + text.slice(0, 30)) +
+    "&body=" + encodeURIComponent(text + (contact ? "\n\n联系方式：" + contact : "") + "\n\n—— 来自捞鱼打标工具 v" + APP_VERSION);
+  $("fbFallback").style.display = "";
+}
+
+$("btnFeedback").addEventListener("click", () => {
+  $("fbText").value = "";
+  $("fbContact").value = "";
+  $("fbFallback").style.display = "none";
+  $("dlgFeedback").showModal();
+  $("fbText").focus();
+});
+$("fbClose").addEventListener("click", () => $("dlgFeedback").close());
+$("fbText").addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) $("fbSend").click(); // Ctrl+Enter 直接发
+});
+$("fbSend").addEventListener("click", async () => {
+  const text = $("fbText").value.trim();
+  const contact = $("fbContact").value.trim();
+  if (!text) { toast("先写点什么再发吧，一句话也行～", true); return; }
+  const btn = $("fbSend");
+  btn.disabled = true; btn.textContent = "发送中…";
+  try {
+    const r = await fetch("/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, contact, version: APP_VERSION })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (j.ok) {
+      toast("反馈已送达捞鱼，看到会找你～", false, "thanks.png");
+      $("dlgFeedback").close();
+    } else {
+      toast("发送没成功：" + (j.error || "未知原因"), true);
+      showFbFallback(text, contact);
+    }
+  } catch (e) {
+    toast("发送失败：工具服务器没响应", true);
+    showFbFallback(text, contact);
+  } finally {
+    btn.disabled = false; btn.textContent = "🚀 一键发送";
+  }
+});
 function fmtTime(s) {
   if (!isFinite(s)) return "0:00";
   s = Math.floor(s);
