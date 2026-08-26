@@ -75,11 +75,43 @@ function discoverMusicDirs() {
 // 安全解析 /music/<name>：拒绝路径穿越，返回真实存在的文件路径（跨已发现目录找）
 function resolveMusicPath(name) {
   if (!name || /[\\/]|\.\./.test(name)) return null;
-  for (const dir of discoverMusicDirs()) {
+  for (const dir of discoverMusicDirs().concat(userMusicDirs())) {
     const p = path.join(dir, name);
     try { if (fs.statSync(p).isFile()) return p; } catch (e) {}
   }
   return null;
+}
+
+/* ── 用户常驻目录：手动注册的音乐/音效文件夹（含共享同步盘）──────────
+   存 user-dirs.json：[{dir, kind}]。服务重启自动重扫，浏览器端零授权，
+   解决「超级导入/手动加的目录重启后文件全部丢失」的问题。 */
+const USER_DIRS_FILE = path.join(TOOL_DIR, "user-dirs.json");
+function loadUserDirs() {
+  try {
+    const a = JSON.parse(fs.readFileSync(USER_DIRS_FILE, "utf8"));
+    return Array.isArray(a)
+      ? a.filter(x => x && x.dir)
+        .map(x => ({ ...x, dir: path.resolve(TOOL_DIR, x.dir) })) // 相对路径按工具目录解析，手编配置也容错
+      : [];
+  } catch (e) { return []; }
+}
+function saveUserDirs(list) {
+  try { fs.writeFileSync(USER_DIRS_FILE, JSON.stringify(list, null, 2), "utf8"); }
+  catch (e) { console.error("user-dirs.json 写入失败：" + e.message); }
+  _userDirsOk = null; _userDirsAt = 0; // 目录列表变了，两层缓存都立刻失效
+  manifestAt = 0;
+}
+// 用户目录缓存 60 秒：网络盘 IO 慢，别每首探活都去 stat
+let _userDirsAt = 0, _userDirsOk = null;
+function userMusicDirs() {
+  if (_userDirsOk && Date.now() - _userDirsAt < 60000) return _userDirsOk;
+  const dirs = [];
+  for (const u of loadUserDirs()) {
+    try { if (fs.statSync(u.dir).isDirectory()) dirs.push(u.dir); }
+    catch (e) { console.warn("用户目录暂不可访问（跳过）：" + u.dir); } // 网络盘没挂上等情况，静默跳过
+  }
+  _userDirsOk = dirs; _userDirsAt = Date.now();
+  return dirs;
 }
 
 const MIME = {
@@ -185,11 +217,16 @@ function readAudioDuration(p, fmt, size, mtime) {
 function buildManifest() {
   if (manifestCache && Date.now() - manifestAt < 10000) return manifestCache;
   const dirs = discoverMusicDirs();
+  const userDirs = loadUserDirs(); // {dir, kind}：手动注册的常驻目录，kind 视为用户确认过
+  const userPaths = new Set(userDirs.map(u => u.dir));
+  const kindByDir = new Map(userDirs.map(u => [u.dir, u.kind || "music"]));
+  const allDirs = dirs.concat(userMusicDirs()); // 用户目录排在缓存目录后面：同名时缓存侧（原哈希名）优先
   const seen = new Map(); // 主文件名（去扩展名）-> {name, fmt, size, url, dir}
-  const counts = dirs.map(() => 0);
-  dirs.forEach((dir, di) => {
+  const counts = allDirs.map(() => 0);
+  allDirs.forEach((dir, di) => {
     let files;
     try { files = fs.readdirSync(dir); } catch (e) { return; }
+    const isUser = userPaths.has(dir);
     for (const f of files) {
       const m = /\.(mp3|m4a|wav|ogg|flac)$/i.exec(f);
       if (!m) continue;
@@ -205,15 +242,20 @@ function buildManifest() {
           fmt,
           size: st.size,
           duration: readAudioDuration(p, fmt, st.size, st.mtimeMs), // 秒；供前端自动分类音乐/音效
-          kind: "music",
+          kind: kindByDir.get(dir) || "music",
+          kindManual: isUser ? true : undefined, // 用户注册目录的类型视为确认过，前端不再按时长改判
           url: "/music/" + encodeURIComponent(f),
-          dir: di, // 来自哪个缓存目录（前端多位置选择用）
+          dir: di, // 来自哪个目录（前端多位置选择用）
         });
       } catch (e) { /* 文件被剪映删了一半之类，跳过 */ }
     }
   });
   manifestCache = JSON.stringify({
-    cacheDirs: dirs.map((d, i) => ({ dir: d, count: counts[i] })), // 各缓存位置及音频数（前端选择框用）
+    cacheDirs: allDirs.map((d, i) => ({
+      dir: d, count: counts[i],
+      user: userPaths.has(d) || undefined,      // 手动注册的目录：前端选择框里带「移除注册」入口
+      kind: kindByDir.get(d) || undefined,
+    })),
     files: [...seen.values()],
   });
   manifestAt = Date.now();
@@ -277,6 +319,75 @@ async function handleFeedback(req, res) {
   }
 }
 
+/* ── 用户常驻目录管理：弹 Windows 原生选框拿绝对路径，注册进 user-dirs.json ──
+   为什么不走浏览器选目录：浏览器拿不到绝对路径、File 对象重启即失；
+   注册到服务端后重启自动重扫，浏览器端零操作。 */
+async function readJsonBody(req) {
+  const chunks = [];
+  for await (const c of req) chunks.push(c);
+  try { return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); }
+  catch (e) { return {}; }
+}
+function pickFolderDialog() {
+  // STA + UTF-8 输出：FolderBrowserDialog 必须 STA；中文路径必须强制 UTF-8 否则 GBK 乱码
+  return new Promise(resolve => {
+    const { execFile } = require("child_process");
+    execFile("powershell", ["-NoProfile", "-STA", "-Command",
+      "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " +
+      "Add-Type -AssemblyName System.Windows.Forms | Out-Null; " +
+      "$f = New-Object System.Windows.Forms.FolderBrowserDialog; " +
+      "$f.Description = '选择音乐/音效文件夹（工具会记住它，重启自动恢复）'; " +
+      "$f.ShowNewFolderButton = $false; " +
+      "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }"],
+      { timeout: 300000, windowsHide: true, encoding: "utf8" },   // windowsHide:true：隐藏的是控制台宿主，对话框本体照常弹出
+      (err, stdout) => {
+        if (err || !stdout) return resolve(null);
+        const p = String(stdout).trim();
+        resolve(p || null);
+      });
+  });
+}
+async function handleAddDir(req, res) {
+  const reply = obj => res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify(obj));
+  try {
+    const body = await readJsonBody(req);
+    const kind = body.kind === "sfx" ? "sfx" : "music";
+    const dir = await pickFolderDialog();
+    if (!dir) { reply({ ok: false, cancelled: true }); return; }
+    let st;
+    try { st = fs.statSync(dir); } catch (e) { st = null; }
+    if (!st || !st.isDirectory()) { reply({ ok: false, error: "选的文件夹访问不到：" + dir }); return; }
+    const list = loadUserDirs();
+    if (list.some(u => u.dir.toLowerCase() === dir.toLowerCase())) {
+      reply({ ok: false, error: "这个文件夹已经记住过了" }); return;
+    }
+    let count = 0;
+    try { count = fs.readdirSync(dir).filter(f => /\.(mp3|m4a|wav|ogg|flac)$/i.test(f)).length; }
+    catch (e) { /* 空目录或暂时读不了都允许注册 */ }
+    list.push({ dir, kind, added_at: new Date().toISOString() });
+    saveUserDirs(list);
+    console.log("已记住" + (kind === "sfx" ? "音效" : "音乐") + "文件夹（重启自动恢复）：" + dir + "（音频 " + count + " 首）");
+    reply({ ok: true, dir, kind, count });
+  } catch (e) {
+    reply({ ok: false, error: String(e.message || e).slice(0, 200) });
+  }
+}
+async function handleRemoveDir(req, res) {
+  const reply = obj => res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify(obj));
+  try {
+    const body = await readJsonBody(req);
+    const dir = path.resolve(TOOL_DIR, String(body.dir || "")); // 统一成绝对路径再比（正反斜杠/相对写法都认）
+    const list = loadUserDirs();
+    const next = list.filter(u => path.resolve(TOOL_DIR, u.dir) !== dir);
+    if (next.length === list.length) { reply({ ok: false, error: "没找到这个注册目录" }); return; }
+    saveUserDirs(next);
+    console.log("已取消记住文件夹：" + dir);
+    reply({ ok: true });
+  } catch (e) {
+    reply({ ok: false, error: String(e.message || e).slice(0, 200) });
+  }
+}
+
 /* ── 一键更新：下载发布 zip → 解压 → 覆盖工具文件（保留用户数据） ─────────
    用 PowerShell 干活（Windows 自带）；zip 下载先走原站，失败换 gh-proxy 镜像。 */
 async function handleSelfUpdate(req, res) {
@@ -305,7 +416,7 @@ $src = Get-ChildItem $tmp -Directory | Where-Object { $_.Name -like 'laoyu-tagge
 # 兼容两种仓库布局：旧版工具在 app/ 子目录，新版直接在仓库根
 $srcDir = Join-Path $src.FullName 'app'
 if (-not (Test-Path $srcDir)) { $srcDir = $src.FullName }
-Get-ChildItem $srcDir | Where-Object { $_.Name -ne 'bgm_library.jsonl' -and $_.Name -ne 'docs' } | ForEach-Object {
+Get-ChildItem $srcDir | Where-Object { $_.Name -ne 'bgm_library.jsonl' -and $_.Name -ne 'docs' -and $_.Name -ne 'user-dirs.json' -and $_.Name -ne 'feedback-webhook.txt' } | ForEach-Object {
   Copy-Item $_.FullName -Destination $dst -Recurse -Force
 }
 Remove-Item $tmp -Recurse -Force -ErrorAction SilentlyContinue
@@ -354,6 +465,14 @@ const server = http.createServer((req, res) => {  try {
       if (req.method !== "POST") { res.writeHead(405); res.end(); return; }
       handleFeedback(req, res);
       return;
+    } else if (pathname === "/add-dir") {
+      if (req.method !== "POST") { res.writeHead(405); res.end(); return; }
+      handleAddDir(req, res);
+      return;
+    } else if (pathname === "/remove-dir") {
+      if (req.method !== "POST") { res.writeHead(405); res.end(); return; }
+      handleRemoveDir(req, res);
+      return;
     } else if (pathname.startsWith("/music/")) {
       // HEAD：前端「数据清理」用它探活（文件还在不在），只回头不带体
       if (req.method === "HEAD") {
@@ -364,7 +483,10 @@ const server = http.createServer((req, res) => {  try {
       }
       filePath = resolveMusicPath(pathname.slice(7));
     }
-    if (!filePath || !fs.existsSync(filePath) || !filePath.startsWith(TOOL_DIR) && !filePath.includes("music")) {
+    // 404 保险：文件必须真实存在，且落在工具目录或某个音频目录（剪映缓存/用户注册目录）内
+    // ——只认 TOOL_DIR 或路径含 "music" 会挡住用户注册的共享文件夹，必须按目录白名单判
+    if (!filePath || !fs.existsSync(filePath) ||
+        !filePath.startsWith(TOOL_DIR) && !discoverMusicDirs().concat(userMusicDirs()).some(d => filePath.startsWith(d + path.sep) || filePath === d)) {
       res.writeHead(404); res.end("not found"); return;
     }
     const stat = fs.statSync(filePath);

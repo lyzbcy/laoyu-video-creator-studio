@@ -1,0 +1,5 @@
+# 本机数据：不进仓库、不随分发
+user-dirs.json
+feedback-webhook.txt
+bgm_library.jsonl
+.playwright-cli/

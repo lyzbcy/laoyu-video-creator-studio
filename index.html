@@ -233,6 +233,25 @@
   .tf-tag.on { background: var(--tang); color: #fff; border-color: var(--tang-deep); }
 
   #trackList { flex: 1; overflow-y: auto; padding: 6px; }
+  /* 批量移除操作条 */
+  #selectBar {
+    display: flex; align-items: center; gap: 6px;
+    margin: 0 6px 6px; padding: 8px 12px;
+    background: #faf0d8; border: 2px solid #d8b968; border-radius: 12px;
+    font-size: 13px; color: #7a5511;
+  }
+  /* 列表行的单个移除按钮：平时隐身，hover 才出来 */
+  .track .rowDel {
+    flex-shrink: 0; margin-left: auto;
+    width: 24px; height: 24px; line-height: 1;
+    border: none; border-radius: 8px; cursor: pointer;
+    background: transparent; color: var(--ink-faint); font-size: 13px;
+    opacity: 0; transition: opacity .12s, background .12s;
+  }
+  .track:hover .rowDel { opacity: 1; }
+  .track .rowDel:hover { background: var(--tang-soft); color: var(--tang-deep); }
+  .track input.selCb { flex-shrink: 0; margin: 0 2px 0 0; cursor: pointer; }
+  .track.removedRow { cursor: default; }
   .track {
     display: flex;
     align-items: center;
@@ -535,7 +554,7 @@
   <button class="btn moss bouncy" id="btnSyncJy" title="增量导入剪映缓存文件夹里的音乐（已导入过的自动跳过）">⤵ 一键同步剪映缓存</button>
   <button class="btn bouncy" id="btnAddMusic">🎵 加音乐目录</button>
   <button class="btn bouncy" id="btnAddSfx">🔊 加音效目录</button>
-  <button class="btn bouncy" id="btnBind">🔗 数据库</button>
+  <button class="btn bouncy" id="btnBind" title="打开并绑定 bgm_library.jsonl——打开已有文件直接连接，不会覆盖它">🔗 数据库</button>
   <span id="dbStatus">未绑定 — 数据只存浏览器本地</span>
   <span class="spacer"></span>
   <button class="btn bouncy" id="btnAiTag" title="根据备注文本自动补标签（增量，不覆盖已有标签）">✨ 备注打标</button>
@@ -569,14 +588,24 @@
         <button class="active" data-f="all">全部<span class="cnt" id="cntAll"></span></button>
         <button data-f="labeled">✅ 已打<span class="cnt" id="cntDone"></span></button>
         <button data-f="unlabeled">⬜ 未打<span class="cnt" id="cntTodo"></span></button>
+        <button data-f="removed">🚫 已移除<span class="cnt" id="cntRemoved"></span></button>
       </div>
       <div class="filterRow">
         <button class="active" data-k="all">🎵+🔊+🌫️</button>
         <button data-k="music">🎵 音乐</button>
         <button data-k="sfx">🔊 音效</button>
         <button data-k="ambient">🌫️ 底噪</button>
+        <button id="btnBulkRemove" title="勾选多首一起移除（移除≠删除文件，可到「🚫 已移除」反悔恢复）">🗑 批量移除</button>
       </div>
       <div id="tagFilterRow"></div>
+    </div>
+    <div id="selectBar" style="display:none">
+      <span id="selCount">已选 0 首</span>
+      <span style="flex:1"></span>
+      <button class="btn small" id="selAll">全选</button>
+      <button class="btn small" id="selNone">全不选</button>
+      <button class="btn small danger" id="selRemove">🚫 移除选中</button>
+      <button class="btn small" id="selExit">退出</button>
     </div>
     <div id="trackList"></div>
   </div>
@@ -690,6 +719,22 @@
   </div>
 </dialog>
 
+<dialog id="dlgBind">
+  <h3><img src="assets/stickers/love.png" alt="">🔗 数据库绑定</h3>
+  <p style="font-size:13.5px; line-height:1.9; margin-bottom:12px">
+    标签数据默认只存在浏览器里；绑定一个数据库文件后，标签会<b>实时写进文件</b>——随文件带走、跨电脑通用、超级导入导出都认它。
+  </p>
+  <div class="dlgBtns" style="justify-content:center; flex-direction:column; gap:10px">
+    <button id="btnBindOpen" class="btn primary bouncy" style="width:100%">📂 打开已有数据库（推荐）</button>
+    <button id="btnBindNew" class="btn moss bouncy" style="width:100%">✨ 新建数据库文件（从头开始用这个）</button>
+    <button id="btnBindCancel" class="btn bouncy" style="width:60%">取消</button>
+  </div>
+  <p style="font-size:12px; color:var(--ink-faint); margin-top:10px; text-align:center; line-height:1.7">
+    打开 = 选中已存在的 bgm_library.jsonl 直接连接，不会覆盖它<br>
+    新建 = 选个位置生成文件，<b>当前已打的标签会自动全部写进去</b>，一根毛都不丢
+  </p>
+</dialog>
+
 <dialog id="dlgSuperImport">
   <h3><img src="assets/stickers/love.png" alt="">🚀 超级导入 — 发现标签数据</h3>
   <p style="font-size:13.5px; line-height:1.9; margin-bottom:12px" id="siPreview"></p>
@@ -746,7 +791,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.11.2";
+const APP_VERSION = "2.12.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -790,6 +835,8 @@ const state = {
   kindFilter: "all",
   search: "",
   tagFilter: null,
+  selectMode: false,   // 批量移除模式（仅会话内）
+  selectedIds: null,   // 批量勾选集合 Set（仅会话内）
   blocklist: [],     // 数据清理里清掉的「无法解码」条目 id，同步时跳过防复活
   handle: null,      // FileSystemFileHandle（运行时）
   lastKnownMtime: 0, // 自己写入后的 mtime，轮询时跳过
@@ -1046,36 +1093,83 @@ function updateDbStatus() {
   }
 }
 
-$("btnBind").addEventListener("click", async () => {
-  if (!window.showSaveFilePicker) {
+/* 绑定一个数据库 handle 的完整流程：读入（如有内容）→ 持久化 handle → 当前库全量写进文件。
+   「打开」「新建」「超级导入自动绑定」三条路都走这里，行为永远一致。 */
+async function attachDbHandle(handle, how) {
+  state.handle = handle;
+  try {
+    const file = await handle.getFile();
+    if (file.size > 0) {
+      importJSONLText(await file.text(), true);
+      state.lastKnownMtime = file.lastModified;
+      toast("已绑定并读入：" + file.name, false, "thanks.png");
+    } else {
+      toast("已绑定：" + file.name, false, "love.png");
+    }
+  } catch (e) { /* 读失败当空文件 */ }
+  await idbPut("dbHandle", handle); // 关键：持久化 handle，下次自动恢复
+  log("ok", "绑定", `数据库文件已绑定（${how}）：` + handle.name);
+  await saveDB(how);
+  $("restoreBanner").classList.remove("show");
+  updateDbStatus(); renderAll();
+}
+
+$("btnBind").addEventListener("click", () => {
+  if (!window.showOpenFilePicker || !window.showSaveFilePicker) {
     toast("当前浏览器不支持文件绑定，请用 Edge/Chrome", true);
     return;
   }
+  $("dlgBind").showModal();
+});
+$("btnBindCancel").addEventListener("click", () => $("dlgBind").close());
+$("btnBindOpen").addEventListener("click", async () => {
+  $("dlgBind").close();
   try {
-    const handle = await window.showSaveFilePicker({
-      suggestedName: "bgm_library.jsonl",
-      types: [{ description: "JSONL", accept: { "application/json": [".jsonl"] } }],
+    // 「打开」语义：选中已存在的 bgm_library.jsonl 直接绑定读写，绝不是「另存为/覆盖」
+    const [handle] = await window.showOpenFilePicker({
+      multiple: false,
+      types: [{ description: "标签数据库（bgm_library.jsonl）", accept: { "application/json": [".jsonl", ".json"] } }],
     });
-    const switched = state.handle && state.handle !== handle;
-    state.handle = handle;
-    try {
-      const file = await handle.getFile();
-      if (file.size > 0) {
-        importJSONLText(await file.text(), true);
-        toast("已绑定并读入现有数据", false, "thanks.png");
-      } else {
-        toast("已绑定新数据库文件", false, "love.png");
-      }
-    } catch (e) { /* 读失败当新文件 */ }
-    await idbPut("dbHandle", handle); // 关键：持久化 handle，下次自动恢复
-    log("ok", "绑定", "数据库文件已绑定：" + handle.name);
-    await saveDB("绑定");
-    $("restoreBanner").classList.remove("show");
-    updateDbStatus(); renderAll();
+    await attachDbHandle(handle, "打开");
   } catch (e) {
     if (e.name !== "AbortError") { toast("绑定失败：" + e.message, true); log("err", "绑定", e.message); }
   }
 });
+$("btnBindNew").addEventListener("click", async () => {
+  $("dlgBind").close();
+  try {
+    // 「新建」语义：选个位置生成 bgm_library.jsonl；当前 localStorage 里已有的标签随 saveDB 全量写入
+    const handle = await window.showSaveFilePicker({
+      suggestedName: "bgm_library.jsonl",
+      types: [{ description: "标签数据库", accept: { "application/json": [".jsonl"] } }],
+    });
+    await attachDbHandle(handle, "新建");
+    toast("新数据库已建好，当前标签全部写入 ✓", false, "cheer.png");
+  } catch (e) {
+    if (e.name !== "AbortError") { toast("新建失败：" + e.message, true); log("err", "绑定", e.message); }
+  }
+});
+
+/* 超级导入重建/合并完自动把数据库绑上：就在点按钮的手势里弹一次选择，
+   选中刚导入的那个 bgm_library.jsonl 即永久绑定，省掉再去找「🔗 数据库」。
+   浏览器安全模型不允许网页从 input 拿到文件路径直接变 handle，这一下选择绕不开。 */
+async function autoBindDb() {
+  if (!window.showOpenFilePicker) return;
+  try {
+    const [handle] = await window.showOpenFilePicker({
+      multiple: false,
+      types: [{ description: "刚导入的标签数据库（bgm_library.json）", accept: { "application/json": [".jsonl", ".json"] } }],
+    });
+    await attachDbHandle(handle, "超级导入绑定"); // 把刚重建/合并的库固化进文件
+    toast("数据库已绑定：" + handle.name + "，以后标签自动存这里", false, "thanks.png");
+  } catch (e) {
+    if (e.name === "AbortError") {
+      toast("先不绑定也行，标签暂存浏览器；点「🔗 数据库」随时可绑", false, "hmm.png");
+    } else {
+      log("warn", "自动绑定", e.message);
+    }
+  }
+}
 
 async function tryRestoreHandle() {
   try {
@@ -1220,7 +1314,38 @@ function waveformRefine(track, peaks) {
   return false;
 }
 
-function pickDirectory(kind) {
+async function pickDirectory(kind) {
+  // 服务器模式：走服务端原生选框并注册为常驻目录——重启/换浏览器自动恢复，不再丢文件
+  if (state._serverMode) {
+    toast("在弹出的窗口里选文件夹…", false, "hmm.png");
+    try {
+      const r = await fetch("/add-dir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind })
+      });
+      const j = await r.json();
+      if (j.ok) {
+        // 新目录自动并入「记住的同步位置」，避免多目录选择框把它过滤掉
+        try {
+          const rem = JSON.parse(localStorage.getItem(LS_KEY_CACHEDIRS) || "[]");
+          if (Array.isArray(rem) && !rem.includes(j.dir)) {
+            rem.push(j.dir);
+            localStorage.setItem(LS_KEY_CACHEDIRS, JSON.stringify(rem));
+          }
+        } catch (e) {}
+        log("ok", "记住文件夹", `${j.dir}（${kind === "sfx" ? "音效" : "音乐"}，${j.count} 首音频，重启自动恢复）`);
+        toast(`已记住文件夹（${j.count} 首音频）——重启后自动恢复，不用再选`, false, "cheer.png");
+        await syncFromServer(false, true);
+      } else if (!j.cancelled) {
+        toast("添加失败：" + (j.error || "未知原因"), true);
+      }
+    } catch (e) {
+      toast("添加失败：工具服务器没响应", true);
+    }
+    return;
+  }
+  // file:// 模式兜底：浏览器选目录（File 对象只在本会话有效）
   const inp = document.createElement("input");
   inp.type = "file";
   inp.webkitdirectory = true;
@@ -1413,6 +1538,17 @@ function isLabeled(id) {
 }
 
 function visibleIds() {
+  // 「已移除」页签：看的是 records（track 已被删掉），搜索仍可用，其他筛选不套
+  if (state.filter === "removed") {
+    let ids = Object.keys(state.records).filter(id => state.records[id].excluded).sort();
+    const q = state.search.trim().toLowerCase();
+    if (q) ids = ids.filter(id => {
+      const r = state.records[id];
+      const name = (r.file || id).toLowerCase();
+      return name.includes(q) || (r.note && r.note.toLowerCase().includes(q));
+    });
+    return ids;
+  }
   let ids = state.order;
   const q = state.search.trim().toLowerCase();
   if (q) ids = ids.filter(id => {
@@ -1435,9 +1571,71 @@ function visibleIds() {
   return ids;
 }
 
+/* ── 移除 / 恢复（移除≠删文件：记录打 excluded 标记随 jsonl 走，永不复活）── */
+
+function removeTracks(ids) {
+  let n = 0;
+  for (const id of ids) {
+    if (!state.tracks[id] && !(state.records[id] && !state.records[id].excluded)) continue;
+    const t = state.tracks[id];
+    const r = state.records[id] || { id, file: (t && t.file) || id, kind: (t && t.kind) || "music", tags: {} };
+    r.excluded = true;
+    r.excluded_at = nowISO();
+    if (t && t.displayName) r.file = t.displayName; // 移除时留个能认出来的名字
+    state.records[id] = r;
+    delete state.tracks[id];
+    if (state.current === id) { state.current = null; audio.pause(); audio.removeAttribute("src"); }
+    n++;
+  }
+  if (!n) return 0;
+  rebuildOrder(); scheduleSave("移除音频"); renderAll();
+  log("info", "移除", `移除 ${n} 首（文件未删，「🚫 已移除」里可恢复）`);
+  return n;
+}
+
+function restoreTrack(id) {
+  const r = state.records[id];
+  if (!r || !r.excluded) return;
+  r.excluded = false;
+  delete r.excluded_at;
+  if (!state.tracks[id]) {
+    state.tracks[id] = { id, file: r.file || id, kind: r.kind || "music", kindSource: null, fmt: "", size: 0, duration: r.duration || null };
+  }
+  rebuildOrder(); scheduleSave("恢复音频"); renderAll();
+  toast("已恢复，重启或同步后自动找回文件", false, "cheer.png");
+}
+
 function renderList() {
   const wrap = $("trackList");
   const ids = visibleIds();
+  updateSelectBar();
+  // 「已移除」页签：records 里的历史条目，行内给恢复按钮
+  if (state.filter === "removed") {
+    if (!ids.length) {
+      wrap.innerHTML = `<div id="emptyHint"><img src="assets/stickers/tehe.png" alt="">这里空空的——移除过的音频会出现在这里，随时可以反悔恢复</div>`;
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    for (const id of ids) {
+      const r = state.records[id];
+      const div = document.createElement("div");
+      div.className = "track removedRow";
+      const preview = Object.values(r.tags || {}).flat().slice(0, 3).join("·");
+      div.innerHTML = `<span class="status">🚫</span>` +
+        `<span class="kindBadge ${r.kind || "music"}">${r.kind === "sfx" ? "音效" : r.kind === "ambient" ? "底噪" : "音乐"}</span>` +
+        `<span class="name">${r.file || id}</span>` +
+        (preview ? `<span class="preview-tags">${preview}</span>` : "");
+      const btn = document.createElement("button");
+      btn.className = "btn small bouncy";
+      btn.textContent = "🔄 恢复";
+      btn.style.marginLeft = "auto";
+      btn.onclick = e => { e.stopPropagation(); restoreTrack(id); };
+      div.append(btn);
+      frag.appendChild(div);
+    }
+    wrap.replaceChildren(frag);
+    return;
+  }
   if (!ids.length) {
     const hasAny = Object.keys(state.tracks).length > 0;
     wrap.innerHTML = `<div id="emptyHint"><img src="assets/stickers/${hasAny ? "sad.png" : "sleepy.png"}" alt="">` +
@@ -1449,22 +1647,72 @@ function renderList() {
     const t = state.tracks[id];
     const div = document.createElement("div");
     const alive = trackAlive(t);
-    div.className = "track" + (id === state.current ? " current" : "");
+    div.className = "track" + (id === state.current && !state.selectMode ? " current" : "");
     if (!alive) div.style.opacity = ".45";
     const r = state.records[id];
     const preview = r ? Object.values(r.tags).flat().slice(0, 4).join("·") : "";
     const statusIcon = !alive ? "💤" : isLabeled(id) ? "✅" : "⬜";
     div.title = alive ? "" : "文件不在本地（来自上次会话）：启动服务器/添加目录可恢复，或点「🧹 数据清理」移除";
-    div.innerHTML = `<span class="status">${statusIcon}</span>` +
+    div.innerHTML = (state.selectMode ? `<input type="checkbox" class="selCb" ${state.selectedIds && state.selectedIds.has(id) ? "checked" : ""}>` : `<span class="status">${statusIcon}</span>`) +
       `<span class="kindBadge ${t.kind || "music"}">${t.kind === "sfx" ? "音效" : t.kind === "ambient" ? "底噪" : "音乐"}</span>` +
       `<span class="name">${t.displayName || t.file}</span>` +
       (preview ? `<span class="preview-tags">${preview}</span>` : "") +
-      `<span class="dur">${t.duration ? fmtTime(t.duration) : ""}</span>`;
-    div.onclick = () => playTrack(id);
+      (state.selectMode ? "" : `<span class="dur">${t.duration ? fmtTime(t.duration) : ""}</span><button class="rowDel" title="从工具里移除（文件不删，可反悔）">🗑</button>`);
+    div.onclick = e => {
+      if (state.selectMode) { toggleSelect(id); return; }
+      playTrack(id);
+    };
+    if (state.selectMode) {
+      // 勾选框自己管自己（阻止冒泡到行点击），checked 状态与 selectedIds 保持同步
+      div.querySelector(".selCb").onclick = e => {
+        e.stopPropagation();
+        if (!state.selectedIds) state.selectedIds = new Set();
+        if (e.target.checked) state.selectedIds.add(id); else state.selectedIds.delete(id);
+        updateSelectBar();
+      };
+    } else {
+      div.querySelector(".rowDel").onclick = e => {
+        e.stopPropagation();
+        removeTracks([id]);
+        toast("已移除（文件没删），在「🚫 已移除」里可以反悔", false, "hmm.png");
+      };
+    }
     frag.appendChild(div);
   }
   wrap.replaceChildren(frag);
 }
+
+/* ── 批量移除模式 ────────────────────────────────────────── */
+
+function updateSelectBar() {
+  const bar = $("selectBar");
+  const show = !!state.selectMode && state.filter !== "removed";
+  bar.style.display = show ? "flex" : "none";
+  if (show) $("selCount").textContent = `已选 ${(state.selectedIds ? state.selectedIds.size : 0)} 首（文件不会真删，可反悔）`;
+}
+function toggleSelect(id) {
+  if (!state.selectedIds) state.selectedIds = new Set();
+  if (state.selectedIds.has(id)) state.selectedIds.delete(id);
+  else state.selectedIds.add(id);
+  renderList();
+}
+$("btnBulkRemove").addEventListener("click", () => {
+  state.selectMode = !state.selectMode;
+  state.selectedIds = new Set();
+  if (state.selectMode) toast("批量移除模式：点条目勾选，底部按钮一键移除", false, "hmm.png");
+  renderList();
+});
+$("selAll").addEventListener("click", () => { state.selectedIds = new Set(visibleIds()); renderList(); });
+$("selNone").addEventListener("click", () => { state.selectedIds = new Set(); renderList(); });
+$("selExit").addEventListener("click", () => { state.selectMode = false; state.selectedIds = null; renderList(); });
+$("selRemove").addEventListener("click", () => {
+  const n = state.selectedIds ? state.selectedIds.size : 0;
+  if (!n) { toast("先点几首再移除", true); return; }
+  const ok = removeTracks([...state.selectedIds]);
+  state.selectMode = false; state.selectedIds = null;
+  renderList();
+  if (ok) toast(`已移除 ${ok} 首（文件没删），在「🚫 已移除」里可以反悔`, false, "hmm.png");
+});
 
 function renderProgress() {
   const total = state.order.length;
@@ -1475,6 +1723,9 @@ function renderProgress() {
   $("cntAll").textContent = total ? "" : "";
   $("cntDone").textContent = total ? ` ${done}` : "";
   $("cntTodo").textContent = total ? ` ${total - done}` : "";
+  let rm = 0;
+  for (const id in state.records) if (state.records[id].excluded) rm++;
+  $("cntRemoved").textContent = rm ? ` ${rm}` : "";
 }
 
 function playFirstVisible() {
@@ -1706,7 +1957,7 @@ function stdNameFor(r, t) {
 
 $("btnOrganize").addEventListener("click", async () => {
   if (!window.showDirectoryPicker) { toast("此浏览器不支持选择导出文件夹，请用 Edge/Chrome", true); return; }
-  const labeled = Object.values(state.records).filter(r => isLabeled(r.id) && state.tracks[r.id]);
+  const labeled = Object.values(state.records).filter(r => isLabeled(r.id) && state.tracks[r.id] && !r.excluded);
   if (!labeled.length) { toast("还没有已打标的音频，先打几首再整理", true, "sleepy.png"); return; }
   const withFile = labeled.filter(r => state.tracks[r.id]._file || state.tracks[r.id].url);
   const byKind = k => withFile.filter(r => (r.kind || "music") === k).length;
@@ -1989,11 +2240,12 @@ async function superImport(fileList) {
     return;
   }
 
-  // 2. 音频入库（kind 由所在文件夹决定；id = 重命名后的主文件名）
+  // 2. 音频入库（kind 由所在文件夹决定；id = 重命名后的主文件名）；移除过的（excluded 随包同步过来）不再拉回
   let addedM = 0, addedS = 0, addedA = 0, dup = 0;
   for (const f of [...musicFiles, ...sfxFiles, ...ambFiles]) {
     const kind = sfxFiles.includes(f) ? "sfx" : ambFiles.includes(f) ? "ambient" : "music";
     const base = f.name.replace(/\.[^.]+$/, "");
+    if (state.records[base] && state.records[base].excluded) continue;
     if (state.tracks[base]) {
       const t = state.tracks[base];
       if (!t._file && !t.url) { // 占位补实体，并同步包里的分类结论
@@ -2043,6 +2295,8 @@ async function superImport(fileList) {
     const stem = (r.file || r.id).replace(/\.[^.]+$/, "");
     const t = state.tracks[stem];
     if (!t || r.source_id === stem) continue;
+    // 换电脑前移除过的（excluded 随包同步）：包里的文件实体也不收，直接丢掉
+    if (state.records[r.source_id] && state.records[r.source_id].excluded) { delete state.tracks[stem]; continue; }
     const home = state.tracks[r.source_id];
     if (home) {
       if (!home._file && !home.url) { home._file = t._file; home.url = null; }
@@ -2059,7 +2313,8 @@ async function superImport(fileList) {
     `音频部分已入库：🎵 ${addedM} + 🔊 ${addedS} + 🌫️ ${addedA}${dup ? `（重复 ${dup} 跳过）` : ""}。<br><br>` +
     `<b>用包重建库</b>：抛弃当前库的标签，以这份 Json 为准（清理历史坏数据用这个）<br>` +
     `<b>增量合并</b>：把标签并进当前打开的库（已有人工记录不覆盖）<br>` +
-    `<b>只用当前库</b>：忽略包里的 Json，音频当白板从头打标`;
+    `<b>只用当前库</b>：忽略包里的 Json，音频当白板从头打标<br>` +
+    `<span style="color:var(--ink-faint);font-size:12px">💡 想让重启后自动找回包里的文件？用「🎵 加音乐目录」把这个共享文件夹记住，工具会自动认出包里的音频。</span>`;
   const dlg = $("dlgSuperImport");
   dlg.showModal();
   const buildRec = r => { // 记录挂回原哈希，与 track 同 id
@@ -2070,6 +2325,7 @@ async function superImport(fileList) {
       duration: r.duration || null,
       tags: r.tags || {}, note: r.note,
       source_id: r.source_id,
+      excluded: r.excluded || undefined, // 移除标记随包同步：换电脑导入后同样不再显示/复活
       labeled_at: nowISO(), updated_at: nowISO(),
     }];
   };
@@ -2108,8 +2364,15 @@ async function superImport(fileList) {
       log("info", "超级导入", "按用户选择忽略包内 Json，仅音频入库");
       toast("已忽略包里的 Json，用当前库继续", false, "hmm.png");
     }
+    // 移除标记兜底：记录标记 excluded 的，对应本地 track 一律清掉（不显示、不导出、不复活）
+    for (const id in state.records) {
+      if (state.records[id].excluded && state.tracks[id]) delete state.tracks[id];
+    }
+    if (state.current && !state.tracks[state.current]) state.current = null;
     rebuildOrder(); scheduleSave("超级导入"); renderAll();
     if (!state.current || !state.tracks[state.current]) playFirstVisible(); // 重建后当前条目可能已被清掉
+    // 还没绑定数据库的话，趁着手势直接弹一次选择把它绑上——不用再去找「🔗 数据库」按钮
+    if ((how === "merge" || how === "replace") && !state.handle) autoBindDb();
   };
   $("siMerge").onclick = () => finish("merge");
   $("siReplace").onclick = () => finish("replace");
@@ -2188,6 +2451,7 @@ document.querySelectorAll('[data-f]').forEach(btn => {
     document.querySelectorAll('[data-f]').forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
     state.filter = btn.dataset.f;
+    if (state.filter === "removed" && state.selectMode) { state.selectMode = false; state.selectedIds = null; } // 已移除页签是恢复语义，退出批量模式
     renderList();
   });
 });
@@ -2301,17 +2565,42 @@ function pickCacheDirs(dirs, defaultChecked) {
     const list = $("cdList");
     list.innerHTML = "";
     dirs.forEach((d, i) => {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex; gap:8px; align-items:flex-start";
       const label = document.createElement("label");
-      label.style.cssText = "display:flex; gap:8px; align-items:flex-start; cursor:pointer";
+      label.style.cssText = "display:flex; gap:8px; align-items:flex-start; cursor:pointer; flex:1";
       const cb = document.createElement("input");
       cb.type = "checkbox"; cb.checked = !defaultChecked || defaultChecked.includes(d.dir);
       cb.style.marginTop = "6px";
       const span = document.createElement("span");
-      span.innerHTML = `<b>${d.count}</b> 首缓存音频<br><span style="color:var(--ink-faint);font-size:12px;word-break:break-all">${d.dir}</span>`;
+      span.innerHTML = `<b>${d.count}</b> 首${d.user ? `${d.kind === "sfx" ? "🔊音效" : "🎵音乐"}` : "缓存"}音频${d.user ? ` <span style="color:var(--moss);font-size:11px">已记住</span>` : ""}<br><span style="color:var(--ink-faint);font-size:12px;word-break:break-all">${d.dir}</span>`;
       label.append(cb, span);
-      list.append(label);
+      row.append(label);
+      // 手动注册的常驻目录：给个「取消记住」入口（缓存目录是自动发现的，没有这个按钮）
+      if (d.user) {
+        const del = document.createElement("button");
+        del.className = "btn small bouncy";
+        del.textContent = "✕";
+        del.title = "不再记住这个文件夹（重启后不再自动扫描它）";
+        del.style.cssText = "flex-shrink:0; margin-top:2px";
+        del.onclick = async () => {
+          try {
+            const r = await fetch("/remove-dir", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ dir: d.dir }) });
+            const j = await r.json();
+            if (j.ok) {
+              toast("已取消记住：" + d.dir, false, "hmm.png");
+              log("info", "目录管理", "已取消记住 " + d.dir);
+              $("dlgCacheDirs").close();
+              resolve(null);
+            } else toast("取消失败：" + (j.error || ""), true);
+          } catch (e) { toast("取消失败：服务器没响应", true); }
+        };
+        row.append(del);
+      }
+      list.append(row);
     });
-    $("cdHint").innerHTML = "你这台电脑上有 <b>" + dirs.length + "</b> 个地方存着剪映缓存（可能是改过缓存位置留下的）。<br>勾选要同步的（重复的文件会自动去重），这个选择会被记住，以后点「⤵ 一键同步」可以重选。";
+    const hasUser = dirs.some(d => d.user);
+    $("cdHint").innerHTML = "你这台电脑上有 <b>" + dirs.length + "</b> 个音频来源" + (hasUser ? "（绿色「已记住」的是你手动添加的文件夹，重启自动恢复；✕ 可取消记住）" : "（可能是改过剪映缓存位置留下的）") + "。<br>勾选要同步的（重复的文件会自动去重），这个选择会被记住，以后点「⤵ 一键同步」可以重选。";
     const dlg = $("dlgCacheDirs");
     dlg.showModal();
     const done = val => { dlg.close(); resolve(val); };
@@ -2349,11 +2638,30 @@ async function syncFromServer(first, forceChoose = false) {
       data.files = data.files.filter(f => okIdx.has(f.dir));
       log("info", "服务器同步", `发现 ${allDirs.length} 个缓存位置，本次同步 ${remembered.length} 个（共 ${data.files.length} 首）`);
     }
-    let added = 0, kindFixed = 0;
+    let added = 0, kindFixed = 0, rebinded = 0;
     for (const f of data.files || []) {
       const base2 = f.name.replace(/\.[^.]+$/, "");
-      if ((state.blocklist || []).includes(base2)) continue; // 「数据清理」清掉的无法解码条目，别再拉回来
       const url = f.url || base + "/music/" + encodeURIComponent(f.name);
+      if ((state.blocklist || []).includes(base2)) continue; // 「数据清理」清掉的无法解码条目，别再拉回来
+      // 用户手动移除过的（excluded 写在记录里、随 jsonl 跨电脑同步），永远不再拉回来
+      if (state.records[base2] && state.records[base2].excluded) continue;
+      // 「整理导出」标准名（…_32位哈希）：把文件实体挂回原哈希条目——
+      // 共享文件夹里的导出包靠这个认祖归宗，B 电脑重启后不用再超级导入一遍
+      const hm = /_([0-9a-f]{32})$/.exec(base2);
+      const hid = hm ? hm[1] : null;
+      if (hid) {
+        if (state.records[hid] && state.records[hid].excluded) continue;
+        const ht = state.tracks[hid];
+        if (ht) {
+          if (!ht._file && !ht.url) { ht.url = f.url || url; if (f.fmt) ht.fmt = f.fmt; rebinded++; }
+          continue; // 原哈希条目已存在（含已挂实体）：标准名不另立门户，避免同一首出现两条
+        }
+        if (state.records[hid]) { // 有记录无 track（重启后的占位记录）：建占位并挂上实体
+          state.tracks[hid] = { id: hid, file: f.name, kind: f.kind || state.records[hid].kind || "music", kindSource: f.kindManual ? "manual" : null, fmt: f.fmt || "", size: f.size || 0, duration: f.duration || state.records[hid].duration || null, _file: null, url: f.url || url };
+          rebinded++; continue;
+        }
+        // 没有原哈希记录：走下面正常入库（stem 作为新条目）
+      }
       if (state.tracks[base2]) {
         const t = state.tracks[base2];
         if (!t._file && !t.url) { t.url = url; if (f.fmt) t.fmt = f.fmt; }
@@ -2363,7 +2671,7 @@ async function syncFromServer(first, forceChoose = false) {
       }
       const nt = {
         id: base2, file: f.name,
-        kind: f.kind || "music", kindSource: null,
+        kind: f.kind || "music", kindSource: f.kindManual ? "manual" : null,
         fmt: f.fmt || "", size: f.size || 0, duration: f.duration || null,
         _file: null, url,
       };
@@ -2373,12 +2681,12 @@ async function syncFromServer(first, forceChoose = false) {
     }
     rebuildOrder(); saveLocal(); renderList(); renderProgress();
     if (first) {
-      log("info", "服务器模式", `载入 ${added} 首` + (kindFixed ? `，按时长自动分类 ${kindFixed} 首` : ""));
-      toast(`载入 ${added} 首${kindFixed ? `，自动分好 ${kindFixed} 首的类型` : ""}`, false, "wave.png");
+      log("info", "服务器模式", `载入 ${added} 首` + (kindFixed ? `，按时长自动分类 ${kindFixed} 首` : "") + (rebinded ? `，认回导出包文件 ${rebinded} 首` : ""));
+      toast(`载入 ${added} 首${kindFixed ? `，自动分好 ${kindFixed} 首的类型` : ""}${rebinded ? `，认回 ${rebinded} 首导出包文件` : ""}`, false, "wave.png");
       if (state.order.length && !state.current) playFirstVisible();
-    } else if (added) {
-      log("ok", "自动同步", `剪映缓存新增 ${added} 首，已入库`);
-      toast(`剪映缓存有新增，自动加了 ${added} 首 🎉`, false, "cheer.png");
+    } else if (added || rebinded) {
+      log("ok", "自动同步", `剪映缓存新增 ${added} 首，已入库${rebinded ? `；认回导出包文件 ${rebinded} 首` : ""}`);
+      toast(`自动同步：新增 ${added} 首${rebinded ? `，认回 ${rebinded} 首` : ""} 🎉`, false, "cheer.png");
     } else if (kindFixed) {
       log("info", "自动同步", `按时长补判 ${kindFixed} 首的类型`);
     } else if (forceChoose) {
