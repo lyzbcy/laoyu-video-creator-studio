@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>捞鱼打标工具 — BGM/音效边听边打标小铺</title>
 <meta name="description" content="给 BGM 和音效建自己的标签库：边听边打标、剪映缓存自动同步、一键整理导出、备注智能打标。零安装，双击即用。">
+<script>
+  // 强制刷新组件配置：siteVersion 是「页面内容版本」，改页面内容时和 version.json 里的 "site" 各 +1
+  window.FRESH = { siteVersion: 1 };
+</script>
+<script src="assets/fresh.js" defer></script>
 <style>
   :root {
     --bg: #f5efe3; --paper: #fffdf6; --border: #e6dbc4; --border-strong: #d5c6a5;
@@ -107,6 +112,7 @@
       <a href="#features">功能</a>
       <a href="#quick">快速上手</a>
       <a href="#update">更新机制</a>
+      <a href="about.html">关于作者</a>
       <a class="dl-btn" id="navDl" href="#">下载 Windows 版</a>
     </div>
   </div>
@@ -200,9 +206,9 @@
 </section>
 
 <footer>
-  <img src="assets/stickers/laoyu.png" alt="捞鱼">
-  <p>捞鱼打标工具 · 由一个弱小但有梦想的开发者维护</p>
-  <p><a href="https://github.com/lyzbcy/laoyu-tagger">GitHub 仓库</a> · 表情来自星星布丁精选 · 数据永远在你自己电脑里</p>
+  <a href="about.html" title="认识一下捞鱼"><img src="assets/stickers/laoyu.png" alt="捞鱼"></a>
+  <p><a href="about.html" style="color:var(--ink-soft)">捞鱼打标工具 · 由一个弱小但有梦想的开发者维护</a></p>
+  <p><a href="https://github.com/lyzbcy/laoyu-tagger">GitHub 仓库</a> · <a href="about.html">关于作者</a> · 表情来自星星布丁精选 · 数据永远在你自己电脑里</p>
 </footer>
 
 <script>
