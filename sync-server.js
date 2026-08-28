@@ -16,6 +16,24 @@ const PORT = 8431;
 //      自选目录下会有 JianyingPro/剪映 字样的文件夹，探它下面的 User Data\Cache\music / Cache\music
 // 要手动加自己的文件夹：在 discoverMusicDirs() 末尾 found.push("你的路径") 即可。
 let _discAt = 0, _discDirs = null;
+// 素材包结构识别：文件夹若是「整理导出」的素材包（下面有 音乐/音效/环境底噪 子目录），
+// 返回真正要扫描的子目录及各自类型；普通文件夹返回它本身。注册/自动发现都走这一个入口，
+// 用户只需要选一次素材包根目录，音效/底噪的类型就全对。
+function expandAudioDirs(dir, defaultKind) {
+  const out = [];
+  let names;
+  try { names = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return out; }
+  const KIND_BY_NAME = { "音乐": "music", "音效": "sfx", "环境底噪": "ambient", "music": "music", "sfx": "sfx", "ambient": "ambient" };
+  let expanded = false;
+  for (const de of names) {
+    const k = KIND_BY_NAME[de.name];
+    if (!k || !de.isDirectory()) continue;
+    const full = path.join(dir, de.name);
+    try { if (fs.statSync(full).isDirectory()) { out.push({ dir: full, kind: k }); expanded = true; } } catch (e) {}
+  }
+  if (!expanded) out.push({ dir, kind: defaultKind || "music" });
+  return out;
+}
 // 本地固定盘列表（DriveType=3），进程内只查一次。网络映射盘/光驱的同步 IO
 // 可能一卡几十秒，全盘浅扫必须绕开它们；查询失败时保守只扫 C:
 let _fixedDrives = null;
@@ -54,6 +72,11 @@ function discoverMusicDirs() {
       const next = [];
       for (const d of level) {
         let names; try { names = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { continue; }
+        // 素材包自动发现：浅扫途中遇到「整理导出」的包根（有 bgm_library.json），
+        // 把它的 音乐/音效/环境底噪 子目录直接纳入扫描——桌面/下载里的包零配置可用
+        if (names.some(de => de.name === "bgm_library.json")) {
+          for (const p of expandAudioDirs(d, "music")) addDir(p.dir);
+        }
         for (const de of names) {
           if (!de.isDirectory() || SKIP.test(de.name)) continue;
           if (++visited >= 3000) break;
@@ -220,6 +243,8 @@ function buildManifest() {
   const userDirs = loadUserDirs(); // {dir, kind}：手动注册的常驻目录，kind 视为用户确认过
   const userPaths = new Set(userDirs.map(u => u.dir));
   const kindByDir = new Map(userDirs.map(u => [u.dir, u.kind || "music"]));
+  // 素材包子目录名自带类型（自动发现/注册展开出来的 音乐/音效/环境底噪），视为导出时确认过的分类
+  const PKG_KIND = { "音乐": "music", "音效": "sfx", "环境底噪": "ambient", "music": "music", "sfx": "sfx", "ambient": "ambient" };
   const allDirs = dirs.concat(userMusicDirs()); // 用户目录排在缓存目录后面：同名时缓存侧（原哈希名）优先
   const seen = new Map(); // 主文件名（去扩展名）-> {name, fmt, size, url, dir}
   const counts = allDirs.map(() => 0);
@@ -237,13 +262,14 @@ function buildManifest() {
         const st = fs.statSync(p);
         counts[di]++;
         const fmt = sniffFmt(p, m[1].toLowerCase());
+        const pkgKind = PKG_KIND[path.basename(dir)]; // 素材包子目录（音乐/音效/环境底噪）名即类型
         seen.set(base, {
           name: f,
           fmt,
           size: st.size,
           duration: readAudioDuration(p, fmt, st.size, st.mtimeMs), // 秒；供前端自动分类音乐/音效
-          kind: kindByDir.get(dir) || "music",
-          kindManual: isUser ? true : undefined, // 用户注册目录的类型视为确认过，前端不再按时长改判
+          kind: kindByDir.get(dir) || pkgKind || "music",
+          kindManual: isUser || pkgKind ? true : undefined, // 注册目录/素材包分类视为确认过，前端不再按时长改判
           url: "/music/" + encodeURIComponent(f),
           dir: di, // 来自哪个目录（前端多位置选择用）
         });
@@ -329,17 +355,23 @@ async function readJsonBody(req) {
   catch (e) { return {}; }
 }
 function pickFolderDialog() {
-  // STA + UTF-8 输出：FolderBrowserDialog 必须 STA；中文路径必须强制 UTF-8 否则 GBK 乱码
+  // STA + UTF-8 输出：FolderBrowserDialog 必须 STA；中文路径必须强制 UTF-8 否则 GBK 乱码。
+  // 属主窗口：一个 0x0、置顶、屏幕居中的隐形 Form——没有它，从后台进程弹的对话框可能
+  // 渲染在用户看不见的地方（本次 bug：PowerShell 挂着等、屏幕上啥也没有）。
   return new Promise(resolve => {
     const { execFile } = require("child_process");
     execFile("powershell", ["-NoProfile", "-STA", "-Command",
       "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " +
       "Add-Type -AssemblyName System.Windows.Forms | Out-Null; " +
+      "$owner = New-Object System.Windows.Forms.Form; " +
+      "$owner.TopMost = $true; $owner.Size = '0,0'; " +
+      "$owner.StartPosition = 'CenterScreen'; $owner.ShowInTaskbar = $false; " +
       "$f = New-Object System.Windows.Forms.FolderBrowserDialog; " +
       "$f.Description = '选择音乐/音效文件夹（工具会记住它，重启自动恢复）'; " +
       "$f.ShowNewFolderButton = $false; " +
-      "if ($f.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }"],
-      { timeout: 300000, windowsHide: true, encoding: "utf8" },   // windowsHide:true：隐藏的是控制台宿主，对话框本体照常弹出
+      "if ($f.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }; " +
+      "$owner.Dispose()"],
+      { timeout: 300000, windowsHide: true, encoding: "utf8" },   // windowsHide:true：隐藏的是控制台宿主，对话框本体挂在置顶属主上照常弹出
       (err, stdout) => {
         if (err || !stdout) return resolve(null);
         const p = String(stdout).trim();
@@ -357,17 +389,25 @@ async function handleAddDir(req, res) {
     let st;
     try { st = fs.statSync(dir); } catch (e) { st = null; }
     if (!st || !st.isDirectory()) { reply({ ok: false, error: "选的文件夹访问不到：" + dir }); return; }
+    // 素材包展开：选中的若是「整理导出」的包根（下面有 音乐/音效/环境底噪 子目录），
+    // 一次把子目录全记住、类型各归各——用户不用挨个加三次
+    const targets = expandAudioDirs(dir, kind);
     const list = loadUserDirs();
-    if (list.some(u => u.dir.toLowerCase() === dir.toLowerCase())) {
-      reply({ ok: false, error: "这个文件夹已经记住过了" }); return;
+    let fresh = 0, count = 0;
+    for (const t of targets) {
+      if (list.some(u => u.dir.toLowerCase() === t.dir.toLowerCase())) continue;
+      list.push({ dir: t.dir, kind: t.kind, added_at: new Date().toISOString() });
+      fresh++;
     }
-    let count = 0;
-    try { count = fs.readdirSync(dir).filter(f => /\.(mp3|m4a|wav|ogg|flac)$/i.test(f)).length; }
-    catch (e) { /* 空目录或暂时读不了都允许注册 */ }
-    list.push({ dir, kind, added_at: new Date().toISOString() });
-    saveUserDirs(list);
-    console.log("已记住" + (kind === "sfx" ? "音效" : "音乐") + "文件夹（重启自动恢复）：" + dir + "（音频 " + count + " 首）");
-    reply({ ok: true, dir, kind, count });
+    for (const t of targets) {
+      try { count += fs.readdirSync(t.dir).filter(f => /\.(mp3|m4a|wav|ogg|flac)$/i.test(f)).length; }
+      catch (e) { /* 空目录或暂时读不了都允许注册 */ }
+    }
+    if (fresh) saveUserDirs(list);
+    console.log((fresh ? "已记住" : "已确认记住（此前已注册）") + "文件夹（重启自动恢复）："
+      + targets.map(t => (t.kind === "sfx" ? "音效" : t.kind === "ambient" ? "底噪" : "音乐") + "←" + t.dir).join("；")
+      + "（音频 " + count + " 首" + (fresh ? "" : "，本次无新增注册") + "）");
+    reply({ ok: true, dir, kind, count, registered: fresh, total: targets.length });
   } catch (e) {
     reply({ ok: false, error: String(e.message || e).slice(0, 200) });
   }

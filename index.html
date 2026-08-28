@@ -530,6 +530,21 @@
     animation: riseFade .3s ease;
   }
 
+  /* 💤 失联音乐找回横幅 */
+  #dormantBanner {
+    padding: 9px 16px;
+    background: var(--tang-soft);
+    border-bottom: 2px solid var(--tang);
+    font-size: 13px;
+    color: #8a3a1e;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    animation: riseFade .3s ease;
+  }
+
   /* 新手向导 */
   #obDots { display: flex; gap: 7px; justify-content: center; margin-bottom: 16px; }
   #obDots i { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); transition: all .2s; }
@@ -676,6 +691,12 @@
 <div id="liteBanner" style="display:none">
   <span>🌫️ 你现在是「手动模式」（直接双击 index.html 打开的）：能正常打标签，但<b>没有自动同步</b>（要手动点「⤵ 一键同步」选文件夹）、数据只存浏览器（清缓存会丢）。</span>
   <button class="btn primary small bouncy" id="liteHelpBtn">怎么升级全自动？</button>
+</div>
+
+<div id="dormantBanner" style="display:none">
+  <span id="dormantText">💤 有音乐在等你找回</span>
+  <button class="btn primary small bouncy" id="dormantFixBtn">一键找回（只需再选一次文件夹）</button>
+  <button class="btn small bouncy" id="dormantDismissBtn" style="color:var(--ink-faint)">这次不用</button>
 </div>
 
 <div id="restoreBanner">
@@ -856,6 +877,21 @@
   </div>
 </dialog>
 
+<dialog id="dlgRemember">
+  <h3><img src="assets/stickers/cheer.png" alt="">🔒 一劳永逸的机会来了</h3>
+  <p style="font-size:13.5px; line-height:1.9; margin-bottom:10px">
+    导入成功！不过浏览器选的文件夹<b>只在本次有效</b>——下次重启工具，这些音乐又会变成 💤。<br>
+    让工具把文件夹<b>记住</b>吧：以后重启自动恢复、新导出的文件自动出现，<b>再也不用超级导入</b>。
+  </p>
+  <div class="tip" style="background:var(--moss-soft); border:1.5px solid var(--moss); border-radius:12px; padding:8px 13px; margin:0 0 12px; font-size:12.5px; color:#4c6b3a; line-height:1.8">
+    💡 点「记住」后会弹一个 Windows 选框，<b>再选中刚才那个文件夹</b>就行——网页拿不到文件夹的完整位置（安全限制），所以要用系统选框指一次，<b>仅此一次</b>。
+  </div>
+  <div class="dlgBtns">
+    <button id="rmCancel" class="btn bouncy">下次再说</button>
+    <button id="rmOk" class="btn primary bouncy">🔒 记住这个文件夹（推荐）</button>
+  </div>
+</dialog>
+
 <dialog id="dlgCacheDirs">
   <h3><img src="assets/stickers/hmm.png" alt="">🤔 发现多个剪映缓存位置</h3>
   <p style="font-size:13px; line-height:1.8; margin-bottom:10px" id="cdHint"></p>
@@ -943,7 +979,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.13.0";
+const APP_VERSION = "2.13.1";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -1491,6 +1527,8 @@ async function pickDirectory(kind) {
         await syncFromServer(false, true);
       } else if (!j.cancelled) {
         toast("添加失败：" + (j.error || "未知原因"), true);
+      } else {
+        toast("没选文件夹（已取消）——随时可以再点", false, "hmm.png");
       }
     } catch (e) {
       toast("添加失败：工具服务器没响应", true);
@@ -2423,6 +2461,7 @@ async function superImport(fileList) {
   if (!jsonFile) {
     log("ok", "超级导入", `入库 音乐 ${addedM} / 音效 ${addedS} / 底噪 ${addedA}${dup ? `，重复 ${dup}` : ""}；无 Json 文件`);
     toast(`导入完成：音乐 ${addedM} + 音效 ${addedS} + 底噪 ${addedA}${dup ? `（重复 ${dup} 跳过）` : ""}，没找到 Json 文件`, false, "wave.png");
+    offerRememberDir(); // 服务器模式：趁热提议记住文件夹，治「重启又失效」
     return;
   }
   let payload = null;
@@ -2466,7 +2505,7 @@ async function superImport(fileList) {
     `<b>用包重建库</b>：抛弃当前库的标签，以这份 Json 为准（清理历史坏数据用这个）<br>` +
     `<b>增量合并</b>：把标签并进当前打开的库（已有人工记录不覆盖）<br>` +
     `<b>只用当前库</b>：忽略包里的 Json，音频当白板从头打标<br>` +
-    `<span style="color:var(--ink-faint);font-size:12px">💡 想让重启后自动找回包里的文件？用「🎵 加音乐目录」把这个共享文件夹记住，工具会自动认出包里的音频。</span>`;
+    `<span style="color:var(--ink-faint);font-size:12px">💡 只是找回失联音乐的话，选「只用当前库」就行，标签都还在。导入完成后工具会问你一次要不要记住这个文件夹——记住后重启自动恢复，不用再导入。</span>`;
   const dlg = $("dlgSuperImport");
   dlg.showModal();
   const buildRec = r => { // 记录挂回原哈希，与 track 同 id
@@ -2525,11 +2564,12 @@ async function superImport(fileList) {
     if (!state.current || !state.tracks[state.current]) playFirstVisible(); // 重建后当前条目可能已被清掉
     // 还没绑定数据库的话，趁着手势直接弹一次选择把它绑上——不用再去找「🔗 数据库」按钮
     if ((how === "merge" || how === "replace") && !state.handle) autoBindDb();
+    offerRememberDir(); // 服务器模式：导入完就提议记住文件夹，避免下次重启又 💤 再来一遍
   };
   $("siMerge").onclick = () => finish("merge");
   $("siReplace").onclick = () => finish("replace");
   $("siIgnore").onclick = () => finish("ignore");
-  $("siCancel").onclick = () => { dlg.close(); log("warn", "超级导入", "用户取消（音频已入库）"); };
+  $("siCancel").onclick = () => { dlg.close(); log("warn", "超级导入", "用户取消（音频已入库）"); offerRememberDir(); };
 }
 
 /* ══════════════ 标签组管理弹窗 ══════════════ */
@@ -2849,6 +2889,9 @@ async function syncFromServer(first, forceChoose = false) {
     return added;
   } catch (e) {
     if (first) { toast("服务器清单载入失败：" + e.message, true); log("err", "服务器模式", e.message); }
+  } finally {
+    state._syncSettled = true; // 首次同步落定后才允许「💤 找回横幅」出来，避免启动瞬间闪现
+    updateDormantBanner();     // 同步可能认回失联文件（横幅消失），也可能确认失联（横幅该出来了）
   }
 }
 
@@ -3177,9 +3220,51 @@ if (location.protocol === "file:") {
 }
 $("liteHelpBtn").addEventListener("click", () => openHelp(1));
 
+/* ── 💤 失联音乐自愈 + 超级导入后记住文件夹（v2.13.1）─────────────────
+   根因：超级导入走浏览器选框，文件只在本次会话有效，重启后 url 全丢变 💤，
+   用户被迫每次「超级导入 + 用包重建库」，还有覆盖新标签的风险。
+   解法：服务器模式下把文件夹注册进 user-dirs.json（pickDirectory 干这事），
+   从此重启自动恢复；素材包根目录会被服务器自动展开成 音乐/音效/底噪 三个子目录。 */
+let dormantDismissed = false;   // 本次会话内用户点过「这次不用」就不再烦他
+function updateDormantBanner() {
+  const el = $("dormantBanner");
+  if (!el) return;
+  if (!state._serverMode || !state._syncSettled || dormantDismissed) { el.style.display = "none"; return; }
+  let n = 0;
+  for (const id of state.order) {
+    const t = state.tracks[id];
+    if (!t || t._file || t.url) continue;
+    if (state.records[id] && state.records[id].excluded) continue;
+    n++;
+  }
+  if (!n) { el.style.display = "none"; return; }
+  $("dormantText").innerHTML = `💤 有 <b>${n}</b> 首音乐和工具失联了（重启后丢了文件位置）。点「一键找回」选中存它们的文件夹，<b>只需这一次</b>，以后重启自动恢复。文件要是真删了，请用「🧹 数据清理」处理。`;
+  el.style.display = "flex";
+}
+$("dormantFixBtn").addEventListener("click", async () => {
+  dormantDismissed = true;
+  updateDormantBanner();
+  await pickDirectory("music"); // 注册后 syncFromServer 会自动认回（含标准名→原哈希身份还原）
+});
+$("dormantDismissBtn").addEventListener("click", () => { dormantDismissed = true; updateDormantBanner(); });
+
+// 超级导入完成后主动提议「记住文件夹」：一次会话最多问一次，服务器模式才有意义
+let rememberOffered = false;
+function offerRememberDir() {
+  if (!state._serverMode || rememberOffered) return;
+  rememberOffered = true;
+  setTimeout(() => { try { $("dlgRemember").showModal(); } catch (e) {} }, 700);
+}
+$("rmOk").addEventListener("click", async () => {
+  $("dlgRemember").close();
+  await pickDirectory("music");
+});
+$("rmCancel").addEventListener("click", () => $("dlgRemember").close());
+
 /* ══════════════ 启动 ══════════════ */
 function renderAll() {
   renderList(); renderProgress(); renderTagPanel(); renderTagFilters(); renderNowName();
+  updateDormantBanner();
 }
 
 const restored = loadLocal();
