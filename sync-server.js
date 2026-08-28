@@ -357,8 +357,10 @@ async function readJsonBody(req) {
 function pickFolderDialog() {
   // STA + UTF-8 输出：FolderBrowserDialog 必须 STA；中文路径必须强制 UTF-8 否则 GBK 乱码。
   // 属主窗口：一个 0x0、置顶、屏幕居中的隐形 Form——没有它，从后台进程弹的对话框可能
-  // 渲染在用户看不见的地方（本次 bug：PowerShell 挂着等、屏幕上啥也没有）。
+  // 渲染在用户看不见的地方。SelectedPath：记上次选过的目录，打开直接停在老地方，不再从头找。
   return new Promise(resolve => {
+    const last = readPickerLast();
+    const esc = s => s.replace(/'/g, "''"); // PowerShell 单引号串转义
     const { execFile } = require("child_process");
     execFile("powershell", ["-NoProfile", "-STA", "-Command",
       "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; " +
@@ -367,6 +369,7 @@ function pickFolderDialog() {
       "$owner.TopMost = $true; $owner.Size = '0,0'; " +
       "$owner.StartPosition = 'CenterScreen'; $owner.ShowInTaskbar = $false; " +
       "$f = New-Object System.Windows.Forms.FolderBrowserDialog; " +
+      (last ? "$f.SelectedPath = '" + esc(last) + "'; " : "") +
       "$f.Description = '选择音乐/音效文件夹（工具会记住它，重启自动恢复）'; " +
       "$f.ShowNewFolderButton = $false; " +
       "if ($f.ShowDialog($owner) -eq [System.Windows.Forms.DialogResult]::OK) { Write-Output $f.SelectedPath }; " +
@@ -375,10 +378,107 @@ function pickFolderDialog() {
       (err, stdout) => {
         if (err || !stdout) return resolve(null);
         const p = String(stdout).trim();
+        if (p) { try { fs.writeFileSync(PICKER_LAST_FILE, p, "utf8"); } catch (e) {} } // 记住这次的位置
         resolve(p || null);
       });
   });
 }
+/* ── 超级导入后自动记住文件夹：零操作定位 ──────────────────────────
+   浏览器选框不给绝对路径（安全限制），但素材包文件名带哈希后缀、全盘唯一。
+   页面把「包根目录名 + 若干文件名指纹」POST 过来，服务器定向定位：
+   阶段A 常见位置直探（秒回）；阶段B 限时全盘宽搜（目录名匹配剪枝）。
+   找到直接注册进 user-dirs.json——用户从头到尾不用再选第二次。 */
+const PICKER_LAST_FILE = path.join(TOOL_DIR, "picker-last.txt");
+function readPickerLast() {
+  try { const s = fs.readFileSync(PICKER_LAST_FILE, "utf8").trim(); return s || null; } catch (e) { return null; }
+}
+function probeHit(dir, probes) {
+  // 素材包的音频躺在包根的一级子目录（音乐/音效/底噪）里，探针要连同子目录一起找
+  const tryDirs = [dir];
+  try {
+    for (const de of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (de.isDirectory()) tryDirs.push(path.join(dir, de.name));
+    }
+  } catch (e) {}
+  let n = 0;
+  for (const p of probes) {
+    for (const d of tryDirs) { try { fs.statSync(path.join(d, p)); n++; break; } catch (e) {} }
+  }
+  return n >= Math.min(3, probes.length) && n >= Math.ceil(probes.length * 0.6);
+}
+async function handleFindDir(req, res) {
+  const reply = obj => res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify(obj));
+  try {
+    const body = await readJsonBody(req);
+    const folderName = String(body.folderName || "").trim();
+    const probes = (Array.isArray(body.probes) ? body.probes : [])
+      .map(x => String(x)).filter(x => x && !/[\\/]/.test(x) && x.length < 120).slice(0, 8);
+    if (probes.length < 2) { reply({ ok: false, reason: "no_probes" }); return; }
+
+    // 阶段A：用户常见位置 + 各盘根 + 工具目录旁，直探（含拼 folderName 子层）
+    const home = process.env.USERPROFILE || "";
+    const candidates = [
+      home && path.join(home, "Desktop"), home && path.join(home, "Downloads"),
+      home && path.join(home, "Documents"), home && path.join(home, "Music"),
+      home && path.join(home, "Pictures"), home && path.join(home, "Videos"),
+      TOOL_DIR, path.dirname(TOOL_DIR), path.join(TOOL_DIR, "剪映本地缓存"),
+      ...fixedDrives(),
+    ].filter(Boolean);
+    const seen = new Set();
+    for (const c of candidates) {
+      for (const d of [c, folderName ? path.join(c, folderName) : null]) {
+        if (!d || seen.has(d)) continue;
+        seen.add(d);
+        try { if (fs.statSync(d).isDirectory() && probeHit(d, probes)) return found(d, reply); } catch (e) {}
+      }
+    }
+
+    // 阶段B：限时 DFS 全盘深挖（用户共享盘路径动辄七八层，BFS 扫不深）。
+    // 深度≤12、预算 30000 目录、12 秒；系统目录照旧跳过。
+    const deadline = Date.now() + 12000;
+    const SKIP = /^(windows|program files.*|\$recycle\.bin|system volume information|perflogs|node_modules|\.git|intel|drivers|appdata|winxsx?|installer|packages|temp|cache[0-9]?)$/i;
+    const want = folderName.toLowerCase();
+    let visited = 0, hit = null;
+    const dfs = d => {
+      if (hit || visited > 30000 || Date.now() > deadline) return;
+      let names; try { names = fs.readdirSync(d, { withFileTypes: true }); } catch (e) { return; }
+      for (const de of names) {
+        if (hit || visited > 30000 || Date.now() > deadline) return;
+        if (!de.isDirectory() || SKIP.test(de.name)) continue;
+        visited++;
+        const full = path.join(d, de.name);
+        if (want && de.name.toLowerCase() === want) {
+          try { if (fs.statSync(full).isDirectory() && probeHit(full, probes)) { hit = full; return; } } catch (e) {}
+        }
+        dfs(full);
+      }
+    };
+    for (const root of fixedDrives()) { dfs(root); if (hit) break; }
+    if (hit) return found(hit, reply);
+    reply({ ok: false, reason: "not_found", visited });
+  } catch (e) {
+    reply({ ok: false, reason: "error:" + String(e.message || e).slice(0, 120) });
+  }
+
+  function found(hit, reply) {
+    const targets = expandAudioDirs(hit, "music");
+    const list = loadUserDirs();
+    let fresh = 0;
+    for (const t of targets) {
+      if (list.some(u => u.dir.toLowerCase() === t.dir.toLowerCase())) continue;
+      list.push({ dir: t.dir, kind: t.kind, added_at: new Date().toISOString() });
+      fresh++;
+    }
+    if (fresh) saveUserDirs(list);
+    let count = 0;
+    for (const t of targets) {
+      try { count += fs.readdirSync(t.dir).filter(f => /\.(mp3|m4a|wav|ogg|flac)$/i.test(f)).length; } catch (e) {}
+    }
+    console.log("超级导入自动记住：" + hit + "（音频 " + count + " 首" + (fresh ? "" : "，此前已注册") + "）");
+    reply({ ok: true, dir: hit, registered: fresh, count });
+  }
+}
+
 async function handleAddDir(req, res) {
   const reply = obj => res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" }).end(JSON.stringify(obj));
   try {
@@ -508,6 +608,10 @@ const server = http.createServer((req, res) => {  try {
     } else if (pathname === "/add-dir") {
       if (req.method !== "POST") { res.writeHead(405); res.end(); return; }
       handleAddDir(req, res);
+      return;
+    } else if (pathname === "/find-dir") {
+      if (req.method !== "POST") { res.writeHead(405); res.end(); return; }
+      handleFindDir(req, res);
       return;
     } else if (pathname === "/remove-dir") {
       if (req.method !== "POST") { res.writeHead(405); res.end(); return; }

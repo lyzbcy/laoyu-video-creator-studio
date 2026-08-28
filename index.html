@@ -878,17 +878,17 @@
 </dialog>
 
 <dialog id="dlgRemember">
-  <h3><img src="assets/stickers/cheer.png" alt="">🔒 一劳永逸的机会来了</h3>
+  <h3><img src="assets/stickers/hmm.png" alt="">📍 差一步：指一下文件夹在哪</h3>
   <p style="font-size:13.5px; line-height:1.9; margin-bottom:10px">
-    导入成功！不过浏览器选的文件夹<b>只在本次有效</b>——下次重启工具，这些音乐又会变成 💤。<br>
-    让工具把文件夹<b>记住</b>吧：以后重启自动恢复、新导出的文件自动出现，<b>再也不用超级导入</b>。
+    刚才自动定位没找到这个文件夹（可能在比较深的目录或外接盘上）。<br>
+    指一次路，工具就把它<b>记住</b>：以后重启自动恢复、新导出的文件自动出现，<b>再也不用超级导入</b>。
   </p>
   <div class="tip" style="background:var(--moss-soft); border:1.5px solid var(--moss); border-radius:12px; padding:8px 13px; margin:0 0 12px; font-size:12.5px; color:#4c6b3a; line-height:1.8">
-    💡 点「记住」后会弹一个 Windows 选框，<b>再选中刚才那个文件夹</b>就行——网页拿不到文件夹的完整位置（安全限制），所以要用系统选框指一次，<b>仅此一次</b>。
+    💡 浏览器不告诉网页文件夹的完整位置（安全限制），所以要用 Windows 选框指一次，<b>仅此一次</b>。选框会记住上次的位置，下次直接停在老地方。
   </div>
   <div class="dlgBtns">
     <button id="rmCancel" class="btn bouncy">下次再说</button>
-    <button id="rmOk" class="btn primary bouncy">🔒 记住这个文件夹（推荐）</button>
+    <button id="rmOk" class="btn primary bouncy">📍 指给它看（推荐）</button>
   </div>
 </dialog>
 
@@ -979,7 +979,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.13.1";
+const APP_VERSION = "2.13.2";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -2461,7 +2461,7 @@ async function superImport(fileList) {
   if (!jsonFile) {
     log("ok", "超级导入", `入库 音乐 ${addedM} / 音效 ${addedS} / 底噪 ${addedA}${dup ? `，重复 ${dup}` : ""}；无 Json 文件`);
     toast(`导入完成：音乐 ${addedM} + 音效 ${addedS} + 底噪 ${addedA}${dup ? `（重复 ${dup} 跳过）` : ""}，没找到 Json 文件`, false, "wave.png");
-    offerRememberDir(); // 服务器模式：趁热提议记住文件夹，治「重启又失效」
+    afterImportRemember(fileList); // 自动定位记住（失败才问）——治「重启又失效」
     return;
   }
   let payload = null;
@@ -2543,10 +2543,12 @@ async function superImport(fileList) {
       }
       state.records = next;
       // 连带清掉历史遗留的文件名条目（id 不是原哈希、新记录里也没有的 track）；
-      // 剪映缓存同步来的原生哈希条目保留，下一轮同步自动对上，不受影响
+      // 剪映缓存同步来的原生哈希条目保留，下一轮同步自动对上，不受影响。
+      // 有实体的（url/_file 在线）不清——清了会被下一轮同步原样加回，清↔加无限拉锯
       let pruned = 0;
       for (const id of Object.keys(state.tracks)) {
-        if (!HEX32.test(id) && !state.records[id]) { delete state.tracks[id]; pruned++; }
+        const t = state.tracks[id];
+        if (!HEX32.test(id) && !state.records[id] && !t.url && !t._file) { delete state.tracks[id]; pruned++; }
       }
       const n = Object.keys(state.records).length;
       log("ok", "超级导入", `已用包内数据重建标签库：${n} 条（旧库 ${oldCount} 条作废；清理遗留条目 ${pruned} 个）${restored ? `；身份还原 ${restored} 条挂回原哈希` : ""}`);
@@ -2564,12 +2566,12 @@ async function superImport(fileList) {
     if (!state.current || !state.tracks[state.current]) playFirstVisible(); // 重建后当前条目可能已被清掉
     // 还没绑定数据库的话，趁着手势直接弹一次选择把它绑上——不用再去找「🔗 数据库」按钮
     if ((how === "merge" || how === "replace") && !state.handle) autoBindDb();
-    offerRememberDir(); // 服务器模式：导入完就提议记住文件夹，避免下次重启又 💤 再来一遍
+    afterImportRemember(fileList); // 自动定位记住（失败才问）——避免下次重启又 💤 再来一遍
   };
   $("siMerge").onclick = () => finish("merge");
   $("siReplace").onclick = () => finish("replace");
   $("siIgnore").onclick = () => finish("ignore");
-  $("siCancel").onclick = () => { dlg.close(); log("warn", "超级导入", "用户取消（音频已入库）"); offerRememberDir(); };
+  $("siCancel").onclick = () => { dlg.close(); log("warn", "超级导入", "用户取消（音频已入库）"); afterImportRemember(fileList); };
 }
 
 /* ══════════════ 标签组管理弹窗 ══════════════ */
@@ -2807,45 +2809,65 @@ async function syncFromServer(first, forceChoose = false) {
   try {
     const r = await fetch(base + "/manifest.json", { cache: "no-store" });
     const data = await r.json();
-    // 多缓存位置：让用户勾选要同步哪些（记住上次选择；点「一键同步」可重选）
+    // 多缓存位置：自动同步 = 发现的全部有音频位置都同步（发现即同步，新目录自动进来，
+    // 绝不因记忆失效卡死或漏目录）；只有用户主动点「一键同步」才弹选择框做过滤，
+    // 选择结果只作为下次弹窗的预勾选。曾因 remembered 过滤把同步挂死/漏新目录，整库 💤。
     const allDirs = data.cacheDirs || [];
     const withAudio = allDirs.filter(d => d.count > 0);
-    if (withAudio.length > 1) {
+    if (withAudio.length > 1 && forceChoose) {
       let remembered = null;
       try { remembered = JSON.parse(localStorage.getItem(LS_KEY_CACHEDIRS) || "null"); } catch (e) {}
       const stillValid = Array.isArray(remembered) && remembered.length &&
         remembered.every(d => withAudio.some(x => x.dir === d));
-      if (!stillValid || forceChoose) {
-        const picked = await pickCacheDirs(withAudio, stillValid ? remembered : null);
-        if (!picked || !picked.length) {
-          log("info", "服务器同步", "用户取消了缓存位置选择，本次不同步");
-          if (forceChoose) toast("已取消，未改动同步位置", false, "hmm.png");
-          return;
-        }
-        remembered = picked;
+      const picked = await pickCacheDirs(withAudio, stillValid ? remembered : null);
+      if (!picked || !picked.length) {
+        log("info", "服务器同步", "用户取消了缓存位置选择，本次仍按全部位置同步");
+        toast("已取消：本次按全部发现的位置同步", false, "hmm.png");
+      } else {
         localStorage.setItem(LS_KEY_CACHEDIRS, JSON.stringify(picked));
+        const okIdx = new Set(allDirs.map((d, i) => picked.includes(d.dir) ? i : -1).filter(i => i >= 0));
+        data.files = data.files.filter(f => okIdx.has(f.dir));
+        log("info", "服务器同步", `用户选择同步 ${picked.length}/${allDirs.length} 个位置（共 ${data.files.length} 首）`);
       }
-      const okIdx = new Set(allDirs.map((d, i) => remembered.includes(d.dir) ? i : -1).filter(i => i >= 0));
-      const before = data.files.length;
-      data.files = data.files.filter(f => okIdx.has(f.dir));
-      log("info", "服务器同步", `发现 ${allDirs.length} 个缓存位置，本次同步 ${remembered.length} 个（共 ${data.files.length} 首）`);
     }
-    let added = 0, kindFixed = 0, rebinded = 0;
+    let added = 0, kindFixed = 0, rebinded = 0, pruned = 0;
     for (const f of data.files || []) {
       const base2 = f.name.replace(/\.[^.]+$/, "");
       const url = f.url || base + "/music/" + encodeURIComponent(f.name);
       if ((state.blocklist || []).includes(base2)) continue; // 「数据清理」清掉的无法解码条目，别再拉回来
       // 用户手动移除过的（excluded 写在记录里、随 jsonl 跨电脑同步），永远不再拉回来
       if (state.records[base2] && state.records[base2].excluded) continue;
-      // 「整理导出」标准名（…_32位哈希）：把文件实体挂回原哈希条目——
-      // 共享文件夹里的导出包靠这个认祖归宗，B 电脑重启后不用再超级导入一遍
-      const hm = /_([0-9a-f]{32})$/.exec(base2);
-      const hid = hm ? hm[1] : null;
+      // 「整理导出」标准名（…_哈希前8位 或 早期 _32位）：把文件实体挂回原哈希条目——
+      // 共享文件夹里的导出包靠这个认祖归宗，B 电脑重启后不用再超级导入一遍。
+      // 导出标准是哈希前 8 位（stdNameFor slice(0,8)），所以 8 位后缀也要认：
+      // 在库里找以这 8 位开头的原哈希；命中多个（前缀碰撞）则放弃，当普通文件入库
+      let hid = null;
+      const hm = /_([0-9a-f]{8,32})$/.exec(base2);
+      if (hm) {
+        const suf = hm[1];
+        if (suf.length === 32) hid = suf;
+        else {
+          const cands = Object.keys(state.tracks).filter(k => /^[0-9a-f]{32}$/.test(k) && k.startsWith(suf));
+          if (cands.length === 1) hid = cands[0];
+          else if (!cands.length) {
+            const rc = Object.keys(state.records).filter(k => /^[0-9a-f]{32}$/.test(k) && k.startsWith(suf));
+            if (rc.length === 1) hid = rc[0];
+          }
+        }
+      }
       if (hid) {
         if (state.records[hid] && state.records[hid].excluded) continue;
         const ht = state.tracks[hid];
         if (ht) {
           if (!ht._file && !ht.url) { ht.url = f.url || url; if (f.fmt) ht.fmt = f.fmt; rebinded++; }
+          // 影子清理：标准名 track 本体没有实体、实体已挂回原哈希条目 → 影子删掉，
+          // 不然它永远以 💤 的样子赖在列表里（36 首幽灵就是这么来的）。
+          // 保守起见：影子自带独立打标记录的不动，留给「数据清理」合并。
+          const st = state.tracks[base2];
+          if (st && st !== ht && base2 !== hid && !st._file && !st.url && !state.records[base2]) {
+            delete state.tracks[base2];
+            pruned++;
+          }
           continue; // 原哈希条目已存在（含已挂实体）：标准名不另立门户，避免同一首出现两条
         }
         if (state.records[hid]) { // 有记录无 track（重启后的占位记录）：建占位并挂上实体
@@ -2873,12 +2895,12 @@ async function syncFromServer(first, forceChoose = false) {
     }
     rebuildOrder(); saveLocal(); renderList(); renderProgress();
     if (first) {
-      log("info", "服务器模式", `载入 ${added} 首` + (kindFixed ? `，按时长自动分类 ${kindFixed} 首` : "") + (rebinded ? `，认回导出包文件 ${rebinded} 首` : ""));
-      toast(`载入 ${added} 首${kindFixed ? `，自动分好 ${kindFixed} 首的类型` : ""}${rebinded ? `，认回 ${rebinded} 首导出包文件` : ""}`, false, "wave.png");
+      log("info", "服务器模式", `载入 ${added} 首` + (kindFixed ? `，按时长自动分类 ${kindFixed} 首` : "") + (rebinded ? `，认回导出包文件 ${rebinded} 首` : "") + (pruned ? `，清掉幽灵条目 ${pruned} 个` : ""));
+      toast(`载入 ${added} 首${kindFixed ? `，自动分好 ${kindFixed} 首的类型` : ""}${rebinded ? `，认回 ${rebinded} 首导出包文件` : ""}${pruned ? `，清掉 ${pruned} 个幽灵条目` : ""}`, false, "wave.png");
       if (state.order.length && !state.current) playFirstVisible();
-    } else if (added || rebinded) {
-      log("ok", "自动同步", `剪映缓存新增 ${added} 首，已入库${rebinded ? `；认回导出包文件 ${rebinded} 首` : ""}`);
-      toast(`自动同步：新增 ${added} 首${rebinded ? `，认回 ${rebinded} 首` : ""} 🎉`, false, "cheer.png");
+    } else if (added || rebinded || pruned) {
+      log("ok", "自动同步", `剪映缓存新增 ${added} 首，已入库${rebinded ? `；认回导出包文件 ${rebinded} 首` : ""}${pruned ? `；清掉幽灵条目 ${pruned} 个` : ""}`);
+      toast(`自动同步：新增 ${added} 首${rebinded ? `，认回 ${rebinded} 首` : ""}${pruned ? `，清掉 ${pruned} 个幽灵` : ""} 🎉`, false, "cheer.png");
     } else if (kindFixed) {
       log("info", "自动同步", `按时长补判 ${kindFixed} 首的类型`);
     } else if (forceChoose) {
@@ -3230,15 +3252,19 @@ function updateDormantBanner() {
   const el = $("dormantBanner");
   if (!el) return;
   if (!state._serverMode || !state._syncSettled || dormantDismissed) { el.style.display = "none"; return; }
-  let n = 0;
+  // 按 id 分两类：标准名失联（_哈希后缀）= 素材包在哪，找回有戏；
+  // 纯哈希失联 = 剪映缓存被清过、文件真没了，归宿是「数据清理」，不该用「找回」误导
+  let findable = 0, gone = 0;
   for (const id of state.order) {
     const t = state.tracks[id];
     if (!t || t._file || t.url) continue;
     if (state.records[id] && state.records[id].excluded) continue;
-    n++;
+    if (/^[0-9a-f]{32}$/.test(id)) gone++; else findable++;
   }
-  if (!n) { el.style.display = "none"; return; }
-  $("dormantText").innerHTML = `💤 有 <b>${n}</b> 首音乐和工具失联了（重启后丢了文件位置）。点「一键找回」选中存它们的文件夹，<b>只需这一次</b>，以后重启自动恢复。文件要是真删了，请用「🧹 数据清理」处理。`;
+  if (!findable && !gone) { el.style.display = "none"; return; }
+  $("dormantText").innerHTML = findable
+    ? `💤 有 <b>${findable}</b> 首音乐和工具失联了（重启后丢了文件位置）。点「一键找回」选中存它们的文件夹，<b>只需这一次</b>，以后重启自动恢复。${gone ? `另有 ${gone} 首的文件似乎已被清理（剪映缓存清过），可用「🧹 数据清理」处理。` : ""}`
+    : `🌫️ 有 <b>${gone}</b> 首的文件已不在本机（剪映缓存被清理过），标签都还留着。文件找不回来的话，用「🧹 数据清理」整理；要是它们存在别的文件夹，点「一键找回」选中那个文件夹也能救回。`;
   el.style.display = "flex";
 }
 $("dormantFixBtn").addEventListener("click", async () => {
@@ -3248,12 +3274,41 @@ $("dormantFixBtn").addEventListener("click", async () => {
 });
 $("dormantDismissBtn").addEventListener("click", () => { dormantDismissed = true; updateDormantBanner(); });
 
-// 超级导入完成后主动提议「记住文件夹」：一次会话最多问一次，服务器模式才有意义
+// 超级导入完成后：先让服务器拿文件名指纹全盘自动定位并记住（零操作），
+// 定位失败才退回来问用户——「记住」是默认行为，不是可选项
 let rememberOffered = false;
-function offerRememberDir() {
-  if (!state._serverMode || rememberOffered) return;
+async function autoRememberImportDir(fileList) {
+  if (!state._serverMode || !fileList || !fileList.length) return false;
+  const rel = (fileList[0].webkitRelativePath || fileList[0].name).split("/");
+  const folderName = rel.length > 1 ? rel[0] : "";
+  const isHash = n => /_[0-9a-f]{32}\./.test(n);
+  const probes = [...fileList].map(f => f.name)
+    .sort((a, b) => isHash(b) - isHash(a)) // 哈希后缀优先：全盘唯一，认得准
+    .slice(0, 8);
+  try {
+    const r = await fetch("/find-dir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderName, probes })
+    });
+    const j = await r.json();
+    if (j.ok) {
+      log("ok", "自动记住", `${j.dir}（${j.count} 首音频${j.registered ? "" : "，此前已注册"}）——超级导入后自动定位，零操作`);
+      toast(`已自动记住文件夹：${j.dir}，重启自动恢复 🎉`, false, "cheer.png");
+      await syncFromServer(false, true);
+      return true;
+    }
+    log("info", "自动记住", `没定位到文件夹（${j.reason}），转为询问用户`);
+    return false;
+  } catch (e) {
+    log("warn", "自动记住", "服务器没响应：" + e.message);
+    return false;
+  }
+}
+async function afterImportRemember(fileList) {
   rememberOffered = true;
-  setTimeout(() => { try { $("dlgRemember").showModal(); } catch (e) {} }, 700);
+  if (await autoRememberImportDir(fileList)) return;
+  try { $("dlgRemember").showModal(); } catch (e) {} // 自动定位失败才请用户指一次路
 }
 $("rmOk").addEventListener("click", async () => {
   $("dlgRemember").close();
