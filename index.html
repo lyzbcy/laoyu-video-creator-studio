@@ -515,6 +515,109 @@
   .log-line .la { color: #f3c9a8; flex-shrink: 0; }
   .log-line .ld { word-break: break-all; }
 
+  /* 手动模式提示横幅 */
+  #liteBanner {
+    padding: 9px 16px;
+    background: #e9f0fb;
+    border-bottom: 2px solid #7ba3d0;
+    font-size: 13px;
+    color: #2f5178;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    animation: riseFade .3s ease;
+  }
+
+  /* 新手向导 */
+  #obDots { display: flex; gap: 7px; justify-content: center; margin-bottom: 16px; }
+  #obDots i { width: 10px; height: 10px; border-radius: 50%; background: var(--border-strong); transition: all .2s; }
+  #obDots i.on { background: var(--tang); transform: scale(1.3); }
+  .obStep { min-width: 440px; max-width: 580px; }
+  .obStep .obBig { display: flex; gap: 16px; align-items: center; margin-bottom: 14px; }
+  .obStep .obBig img { width: 66px; height: 66px; flex-shrink: 0; animation: wobble 2.6s ease-in-out infinite; }
+  .obStep .obBig h4 { font-size: 16.5px; }
+  .obStep .obBig small { display: block; font-size: 11.5px; color: var(--ink-faint); font-weight: 400; margin-top: 2px; letter-spacing: 1px; }
+  .obStep .obList { font-size: 13.5px; line-height: 2.05; }
+  .obStep .obList b { color: var(--tang-deep); }
+  .obStep .obDone { display: flex; align-items: center; gap: 10px; background: var(--moss-soft); border: 2px solid var(--moss); border-radius: 14px; padding: 10px 14px; font-size: 13px; color: #4c6b3a; margin-top: 10px; }
+  .obStep .obDone img { width: 28px; height: 28px; }
+  .kbd {
+    display: inline-block;
+    background: var(--paper-2);
+    border: 1px solid var(--border-strong);
+    border-bottom-width: 2.5px;
+    border-radius: 6px;
+    padding: 0 7px;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    margin: 0 3px;
+    line-height: 1.7;
+    vertical-align: 1px;
+  }
+
+  /* 帮助中心 */
+  .helpWrap { display: flex; gap: 16px; min-height: 400px; max-height: 60vh; }
+  .helpNav { display: flex; flex-direction: column; gap: 7px; flex-shrink: 0; width: 178px; }
+  .helpNav button {
+    text-align: left;
+    border: 2px solid var(--border);
+    background: var(--paper-2);
+    border-radius: 12px;
+    padding: 9px 12px;
+    font-size: 12.5px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    font-family: inherit;
+    line-height: 1.45;
+    transition: border-color .15s, background .15s;
+  }
+  .helpNav button:hover { border-color: var(--tang); }
+  .helpNav button.on { border-color: var(--tang); color: var(--ink); background: var(--tang-soft); font-weight: 600; }
+  .helpBody { flex: 1; overflow-y: auto; font-size: 13.5px; line-height: 1.95; padding-right: 8px; min-width: 420px; animation: riseFade .25s ease; }
+  .helpBody h5 { font-size: 14px; margin: 12px 0 6px; color: var(--tang-deep); }
+  .helpBody h5:first-child { margin-top: 0; }
+  .helpBody p { margin-bottom: 4px; }
+  .helpBody b { color: var(--tang-deep); }
+  .helpBody img.hst { width: 28px; height: 28px; vertical-align: -9px; margin-right: 5px; }
+  .helpBody table { border-collapse: collapse; font-size: 12.5px; margin: 8px 0; }
+  .helpBody th, .helpBody td { border: 1.5px solid var(--border); padding: 4px 12px; text-align: left; }
+  .helpBody th { background: var(--paper-2); }
+  .helpBody .tip { background: var(--moss-soft); border: 1.5px solid var(--moss); border-radius: 12px; padding: 8px 13px; margin: 9px 0; font-size: 12.5px; color: #4c6b3a; line-height: 1.8; }
+  .helpBody .warn { background: var(--tang-soft); border: 1.5px solid var(--tang); border-radius: 12px; padding: 8px 13px; margin: 9px 0; font-size: 12.5px; color: #8a3a1e; line-height: 1.8; }
+  .helpBody ol, .helpBody ul { padding-left: 22px; margin: 4px 0; }
+  .helpBody li { margin-bottom: 2px; }
+
+  /* AI 选曲 */
+  .aiFlow { display: flex; gap: 9px; margin-bottom: 14px; flex-wrap: wrap; }
+  .aiFlow .aiStepCard {
+    flex: 1; min-width: 190px;
+    background: var(--paper-2);
+    border: 2px solid var(--border-strong);
+    border-radius: 14px;
+    padding: 10px 13px;
+    font-size: 12.5px;
+    line-height: 1.75;
+    color: var(--ink-soft);
+  }
+  .aiFlow .aiStepCard b { color: var(--tang-deep); display: block; margin-bottom: 3px; }
+  #aiPromptOut {
+    width: 100%;
+    min-width: 480px;
+    min-height: 220px;
+    background: #3f3626;
+    color: #efe6d2;
+    border: 2px solid var(--border-strong);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-family: Consolas, monospace;
+    font-size: 11.5px;
+    line-height: 1.65;
+    resize: vertical;
+    margin-bottom: 0;
+  }
+
   /* toast */
   #toast {
     position: fixed;
@@ -562,11 +665,18 @@
   <button class="btn bouncy" id="btnCleanup" title="清理失效文件（本地已不存在的）+ 合并重复记录（超级导入产生的两份标签）">🧹 数据清理</button>
   <button class="btn primary bouncy" id="btnOrganize" title="把已打标文件按标准名复制到指定文件夹">📦 整理导出</button>
   <button class="btn moss bouncy" id="btnSuperImport" title="导入「整理导出」产出的完整素材包（音乐/音效/Json 三件套）">🚀 超级导入</button>
+  <button class="btn moss bouncy" id="btnAiPick" title="标签攒够了？把整份音乐清单交给 AI，让它按你的剧情挑歌">🤖 AI 选曲</button>
   <button class="btn bouncy" id="btnFeedback" title="用着不顺手、有想法，直接写给捞鱼——点一下就送达">💬 反馈</button>
   <button class="btn bouncy" id="btnLog">📒 日志</button>
   <button class="btn bouncy" id="btnImport">导入</button>
   <button class="btn bouncy" id="btnExport">导出</button>
+  <button class="btn bouncy" id="btnHelp" title="新手入门、歌从哪来、数据存哪、标签怎么给 AI 用——都是大白话">❓ 帮助</button>
 </header>
+
+<div id="liteBanner" style="display:none">
+  <span>🌫️ 你现在是「手动模式」（直接双击 index.html 打开的）：能正常打标签，但<b>没有自动同步</b>（要手动点「⤵ 一键同步」选文件夹）、数据只存浏览器（清缓存会丢）。</span>
+  <button class="btn primary small bouncy" id="liteHelpBtn">怎么升级全自动？</button>
+</div>
 
 <div id="restoreBanner">
   <span>🔗 上次绑定的数据库文件等你确认连接</span>
@@ -778,6 +888,48 @@
   </div>
 </dialog>
 
+<dialog id="dlgOnboard">
+  <div id="obDots"></div>
+  <div id="obBody"></div>
+  <div class="dlgBtns" style="margin-top:14px; align-items:center">
+    <button id="obSkip" class="btn small bouncy" style="color:var(--ink-faint)">跳过，我自己摸索</button>
+    <span style="flex:1"></span>
+    <button id="obPrev" class="btn small bouncy">上一步</button>
+    <button id="obNext" class="btn primary bouncy">下一步</button>
+  </div>
+</dialog>
+
+<dialog id="dlgHelp" style="max-width:920px; width:86vw">
+  <h3><img src="assets/stickers/hmm.png" alt="">❓ 帮助中心 <span style="font-size:11px;color:var(--ink-faint);font-weight:400">挑一个你好奇的，都是大白话</span></h3>
+  <div class="helpWrap">
+    <nav class="helpNav" id="helpNav"></nav>
+    <div class="helpBody" id="helpBody"></div>
+  </div>
+  <div class="dlgBtns" style="margin-top:12px">
+    <button id="btnHelpClose" class="btn bouncy">关闭</button>
+  </div>
+</dialog>
+
+<dialog id="dlgAiPick" style="max-width:860px">
+  <h3><img src="assets/stickers/proud.png" alt="">🤖 AI 选曲助手 — 让 AI 在你的库里替你挑歌</h3>
+  <div class="aiFlow">
+    <div class="aiStepCard"><b>① 先有素材包</b><br>点顶部「📦 整理导出」一次，得到 音乐/、音效/ 文件夹 + bgm_library.json</div>
+    <div class="aiStepCard"><b>② 交给 AI</b><br>下面生成提示词 → 复制 → 粘贴给 Kimi / ChatGPT / 豆包…，再贴上你的剧情</div>
+    <div class="aiStepCard"><b>③ 拿歌</b><br>AI 回你一张「场景 | 选曲 | 理由」表，照文件名去素材包取歌，拖进剪映</div>
+  </div>
+  <label style="font-size:12.5px;color:var(--ink-soft);display:block;margin-bottom:6px">说说这集 / 这段分镜讲什么（可不填，不填就生成通用模板）：</label>
+  <textarea id="aiScene" rows="3" placeholder="例：第3集，主角发现师父被骗，先压抑对峙，然后爆发打斗，最后反派逃走留悬念"></textarea>
+  <div class="dlgBtns" style="justify-content:flex-start; margin-bottom:10px; align-items:center">
+    <button id="aiGen" class="btn primary bouncy">✨ 生成选曲提示词</button>
+    <button id="aiCopy" class="btn moss bouncy">📋 复制</button>
+    <span id="aiStat" style="font-size:12px;color:var(--ink-faint)"></span>
+  </div>
+  <textarea id="aiPromptOut" readonly placeholder="点上面「生成」后，提示词会出现在这里——整段复制给任意 AI 就能开工"></textarea>
+  <div class="dlgBtns" style="margin-top:12px">
+    <button id="aiClose" class="btn bouncy">关闭</button>
+  </div>
+</dialog>
+
 <div id="toast"><img id="toastSticker" src="assets/stickers/happy.png" alt=""><span id="toastText"></span></div>
 
 <script>
@@ -791,7 +943,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.12.0";
+const APP_VERSION = "2.13.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -2777,8 +2929,255 @@ $("btnUpdateNow").addEventListener("click", async () => {
   }
 });
 
-/* ══════════════ 启动 ══════════════ */
+/* ══════════════ 新手向导 / 帮助中心 / AI 选曲 ══════════════ */
 
+const LS_KEY_ONBOARD = "laoyu_tagger_onboard_v1";
+
+/* ── 新手向导：第一次打开自动播放，帮助中心里随时重看 ── */
+let obStep = 0;
+function obSteps() {
+  const bound = !!state.handle;
+  return [
+    {
+      title: "嗨，我是捞鱼！", sub: "WELCOME · 30 秒带你上路", sticker: "happy.png",
+      html: `<div class="obList">
+        你要干的事特别简单：<b>听歌 → 点标签</b>。<br>
+        每听一首，觉得"这首挺燃、适合打斗"，就把对应标签点亮。<br>
+        攒着攒着，你就有了一座<b>自带说明书</b>的音乐库——<br>
+        以后做漫剧，告诉 AI"这段要燃的打斗 BGM"，它直接从你库里点名。
+      </div>`,
+    },
+    {
+      title: "三招走天下", sub: "HOW TO TAG · 核心就这一页", sticker: "wave.png",
+      html: `<div class="obList">
+        <b>①</b> 左边点一首歌，按<span class="kbd">空格</span>播放（再按一下暂停）<br>
+        <b>②</b> 右边把合适的标签点亮：情绪、场景、剧情，点哪亮哪，再点熄灭<br>
+        <b>③</b> 想多说两句就写<b>备注</b>（写得越细，后面 AI 越懂你）<br>
+        按<span class="kbd">→</span>切下一首，一路听下去。标签<b>全自动保存</b>，随关随走。
+      </div>`,
+    },
+    bound ? {
+      title: "数据保险：已就绪", sub: "SAFE · 存钱罐已绑定", sticker: "love.png",
+      html: `<div class="obList">
+        标签的归宿是一个<b>数据库文件</b>（bgm_library.jsonl）——你的"存钱罐"。
+      </div>
+      <div class="obDone"><img src="assets/stickers/cheer.png"> 已经绑定了，每次点选都实时写进文件，清浏览器缓存也不怕，换电脑也能带走。</div>`,
+    } : {
+      title: "给标签上个保险", sub: "SAFE · 强烈推荐，只要 10 秒", sticker: "love.png",
+      html: `<div class="obList">
+        默认标签只存在浏览器里，清缓存就没了。<br>
+        绑定一个数据库文件（你的<b>存钱罐</b>）之后：每次改动 <b>0.8 秒内写进文件</b>，<br>
+        清缓存不怕、换电脑直接带走、超级导入导出都认它。
+      </div>
+      <div class="dlgBtns" style="justify-content:center; margin-top:10px">
+        <button class="btn primary bouncy" data-ob="bind">🔗 好，带我去绑定（10 秒搞定）</button>
+      </div>`,
+    },
+    {
+      title: "打完之后？教 AI 用你的库！", sub: "NEXT LEVEL · 这才是打标的终点", sticker: "proud.png",
+      html: `<div class="obList">
+        标签攒多了，点顶部 <b>🤖 AI 选曲</b>：<br>
+        工具把你的整份音乐清单 + 你的剧情，打包成一段提示词，<br>
+        复制给 Kimi / ChatGPT / 豆包，<b>AI 按剧情替你挑歌</b>，你只管拖进剪映。<br>
+        遇到任何问题，顶部 <b>❓ 帮助</b> 随时有大白话教程。
+      </div>`,
+    },
+  ];
+}
+function renderOnboard() {
+  const steps = obSteps();
+  obStep = Math.max(0, Math.min(obStep, steps.length - 1));
+  const s = steps[obStep];
+  $("obDots").innerHTML = steps.map((_, i) => `<i class="${i <= obStep ? "on" : ""}"></i>`).join("");
+  $("obBody").innerHTML = `<div class="obStep">
+    <div class="obBig"><img src="assets/stickers/${s.sticker}" alt=""><div><h4>${s.title}</h4><small>${s.sub}</small></div></div>
+    ${s.html}
+  </div>`;
+  $("obPrev").style.visibility = obStep === 0 ? "hidden" : "visible";
+  $("obNext").textContent = obStep === steps.length - 1 ? "🎉 开始打标！" : "下一步";
+}
+function showOnboard() {
+  obStep = 0;
+  renderOnboard();
+  $("dlgOnboard").showModal();
+  log("info", "新手向导", "打开新手向导");
+}
+function finishOnboard() {
+  try { localStorage.setItem(LS_KEY_ONBOARD, "1"); } catch (e) {}
+  $("dlgOnboard").close();
+}
+$("obNext").addEventListener("click", () => {
+  if (obStep >= obSteps().length - 1) { finishOnboard(); toast("去吧，边听边打，有问题点「❓ 帮助」", false, "cheer.png"); }
+  else { obStep++; renderOnboard(); }
+});
+$("obPrev").addEventListener("click", () => { obStep--; renderOnboard(); });
+$("obSkip").addEventListener("click", () => { finishOnboard(); log("info", "新手向导", "用户跳过了向导"); });
+$("obBody").addEventListener("click", e => {
+  const act = e.target.closest("[data-ob]")?.dataset.ob;
+  if (act === "bind") { finishOnboard(); $("btnBind").click(); }
+});
+
+/* ── 帮助中心：大白话 + 表情包，按章节挑着看 ── */
+const HELP_CHAPTERS = [
+  { title: "🚀 30 秒上手", html: `
+    <h5><img class="hst" src="assets/stickers/happy.png" alt="">核心就一句话</h5>
+    <p><b>左边听歌，右边点标签</b>，其他都是锦上添花。</p>
+    <table>
+      <tr><th>想干嘛</th><th>怎么弄</th></tr>
+      <tr><td>播放 / 暂停</td><td><span class="kbd">空格</span></td></tr>
+      <tr><td>下一首 / 上一首</td><td><span class="kbd">→</span> / <span class="kbd">←</span></td></tr>
+      <tr><td>打标签</td><td>点右边标签，点哪亮哪，再点熄灭</td></tr>
+      <tr><td>偷懒</td><td>备注写两句 → 顶部「✨ 备注打标」自动补（人工打的不动）</td></tr>
+      <tr><td>音乐标成音效了</td><td>右下角「🎵 这是音乐 / 🔊 这是音效」一键换</td></tr>
+      <tr><td>倍速试听</td><td>播放器右边 1.5x / 2x</td></tr>
+    </table>
+    <div class="tip">💡 左上角头像可以点着玩——捞鱼准备了精选表情随便换。</div>
+    <div class="dlgBtns" style="justify-content:flex-start">
+      <button class="btn small bouncy" data-help="onboard">🎬 重新看一遍新手教程</button>
+    </div>` },
+  { title: "🎵 歌从哪来", html: `
+    <h5><img class="hst" src="assets/stickers/wave.png" alt="">三种进货渠道</h5>
+    <p><b>自动档（强烈推荐）</b>：用文件夹里的「启动打标工具.bat」打开工具。之后你在剪映里新听 / 新下载的音乐，<b>最迟 1 分钟自动出现</b>在列表里，啥都不用点。</p>
+    <p><b>手动档</b>：顶部「⤵ 一键同步剪映缓存」选一次缓存文件夹；或者「🎵 加音乐目录 / 🔊 加音效目录」添加自己的文件夹（工具会记住，重启自动恢复）。</p>
+    <p><b>搬家档</b>：拿到同事的素材包？「🚀 超级导入」选中整个文件夹，音频 + 标签整包还原。</p>
+    <div class="warn">🌫️ 如果你现在是直接双击 index.html 打开的（页面顶部有蓝条提示），那就是手动档——想要自动档，关掉页面去工具文件夹双击「启动打标工具.bat」。</div>
+    <h5>启动时那个黑窗口是什么？</h5>
+    <p>那是工具的<b>发动机</b>。开着它（最小化没关系）才有自动同步；点它右上角 × = 收工下班。找不到窗口时，双击「停止打标工具.bat」也能按端口把它找出来关掉。</p>` },
+  { title: "💾 数据存哪 / 会丢吗", html: `
+    <h5><img class="hst" src="assets/stickers/love.png" alt="">两种存法</h5>
+    <p><b>绑了数据库（推荐）</b>：顶部「🔗 数据库」选一个位置保存 bgm_library.jsonl。之后每次改动 <b>0.8 秒内写进文件</b>——清浏览器缓存不怕，换电脑直接带走。</p>
+    <p><b>没绑</b>：数据存在浏览器 localStorage 里，能用，但清缓存就没了，记得常「导出」备份。</p>
+    <h5>换电脑三步走</h5>
+    <ol>
+      <li>把整个工具文件夹拷到新电脑（bgm_library.jsonl 就在里面）</li>
+      <li>新电脑双击「启动打标工具.bat」（缺 Node.js 会自动帮你装）</li>
+      <li>打开后点「🔗 数据库」→「📂 打开已有数据库」选中那个 jsonl，满血复活</li>
+    </ol>
+    <table>
+      <tr><th>疑问</th><th>答案</th></tr>
+      <tr><td>标签打错了想反悔</td><td>点掉那个标签就行；整首重来用「清空本首标签」</td></tr>
+      <tr><td>列表里的歌不见了</td><td>多半是剪映清了缓存 / 文件被挪走，重新同步或重新加目录</td></tr>
+      <tr><td>打了标签的原文件会被改吗</td><td>永远不会，工具只读它们；导出也是复制不剪切</td></tr>
+    </table>` },
+  { title: "🧠 玩出花", html: `
+    <h5><img class="hst" src="assets/stickers/tehe.png" alt="">进阶四件套</h5>
+    <p><b>✨ 备注打标</b>：备注里写"激昂"，工具自动点亮"燃"——同义词都认识（阴森→悬疑、心跳→紧张…）。已经人工打过的标签神圣不可侵犯。</p>
+    <p><b>🏷️ 一键更新名称</b>：列表名刷新成标准命名（紧张·燃-对峙-铺垫_xxx），一眼看出这歌什么脾气。内部 ID 不变，不影响同步。</p>
+    <p><b>📦 整理导出</b>：把打好的歌按标准名复制成完整素材包：音乐/、音效/、环境底噪/ 三个文件夹 + bgm_library.json（标签数据）。<b>文件名自带标签</b>，这就是给 AI 看的"名片"。</p>
+    <p><b>🧹 数据清理</b>：逐个真实探测文件还在不在，真没了的、浏览器解不了码的列出来，勾选清掉。</p>
+    <h5>标签组也能自定义</h5>
+    <p>右边的标签组可以加标签、加整组、删整组（比如加一组"乐器"）。改完「📦 整理导出」的命名规则会自动跟着走。</p>
+    <div class="tip">💡 页面顶部「🆕 一键更新」：有新版本时点一下，自动下载替换并重启，你的数据一根毛都不丢。</div>` },
+  { title: "🤖 标签怎么给 AI 用", html: `
+    <h5><img class="hst" src="assets/stickers/proud.png" alt="">你打的标签，最终会长成文件名</h5>
+    <p>整理导出之后，每首歌的名字长这样：<code>紧张·燃-对峙-铺垫_00266f48.mp3</code><br>
+    AI 一看文件名就懂：这歌紧张又燃、适合对峙、属于铺垫段。<b>这就是打标的全部意义</b>——把你的听觉经验变成 AI 认识的字。</p>
+    <h5>完整用法三步</h5>
+    <ol>
+      <li><b>📦 整理导出</b>：得到素材包（文件名自带标签）</li>
+      <li><b>🤖 AI 选曲</b>：点顶部按钮生成提示词，复制给任意 AI（Kimi / ChatGPT / 豆包…），贴上你的分镜剧情</li>
+      <li><b>拿歌</b>：AI 回你一张「场景 | 选曲 | 理由」表 → 照文件名去素材包取歌，拖进剪映</li>
+    </ol>
+    <div class="tip">💡 平时不写剧情也行：直接把 bgm_library.json 丢给 AI，问它"我要一段告别用的悲伤曲子"——文件名里的标签它都认识。</div>
+    <div class="dlgBtns" style="justify-content:flex-start">
+      <button class="btn primary small bouncy" data-help="aipick">打开 AI 选曲助手试试</button>
+    </div>` },
+];
+function openHelp(chapter = 0) {
+  const nav = $("helpNav");
+  nav.replaceChildren(...HELP_CHAPTERS.map((c, i) => {
+    const b = document.createElement("button");
+    b.textContent = c.title;
+    b.className = i === chapter ? "on" : "";
+    b.onclick = () => openHelp(i);
+    return b;
+  }));
+  $("helpBody").innerHTML = HELP_CHAPTERS[chapter].html;
+  $("helpBody").scrollTop = 0;
+  const dlg = $("dlgHelp");
+  if (!dlg.open) dlg.showModal();
+}
+$("btnHelp").addEventListener("click", () => openHelp(0));
+$("btnHelpClose").addEventListener("click", () => $("dlgHelp").close());
+$("helpBody").addEventListener("click", e => {
+  const act = e.target.closest("[data-help]")?.dataset.help;
+  if (act === "onboard") { $("dlgHelp").close(); showOnboard(); }
+  else if (act === "aipick") { $("dlgHelp").close(); openAiPick(); }
+});
+
+/* ── AI 选曲：把"音乐清单 + 剧情"打包成提示词，交给任意 AI 挑歌 ── */
+function openAiPick() {
+  $("aiStat").textContent = "";
+  $("dlgAiPick").showModal();
+}
+function fmtDur(sec) {
+  if (!sec || sec <= 0) return "";
+  const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+  return m > 0 ? `约${m}分${String(s).padStart(2, "0")}秒` : `约${s}秒`;
+}
+function buildAiPickPrompt() {
+  const scene = $("aiScene").value.trim();
+  const byKind = { music: [], sfx: [], ambient: [] };
+  let total = 0, unlabeled = 0;
+  for (const id of state.order) {
+    const t = state.tracks[id];
+    const r = state.records[id];
+    if (!t || (r && r.excluded)) continue;
+    total++;
+    const labeled = r && (Object.values(r.tags || {}).some(a => a && a.length) || (r.note || "").trim());
+    if (!labeled) { unlabeled++; continue; }
+    const kind = (r && r.kind) || t.kind || "music";
+    (byKind[kind] || byKind.music).push(
+      "- " + stdNameFor(r, t) +
+      (fmtDur(t.duration || (r && r.duration)) ? "（" + fmtDur(t.duration || (r && r.duration)) + "）" : "") +
+      ((r.note || "").trim() ? " 备注：" + r.note.trim().slice(0, 40) : "")
+    );
+  }
+  const usable = byKind.music.length + byKind.sfx.length + byKind.ambient.length;
+  if (!usable) {
+    $("aiPromptOut").value = "";
+    $("aiStat").textContent = `库里 ${total} 首都还没打过标签`;
+    toast("先打几首标签（或写点备注），AI 才有得挑～", true, "sleepy.png");
+    return;
+  }
+  const nameRule = state.groups.map(g => g.name + "标签").join(" - ");
+  const section = (title, arr) => arr.length ? `## ${title}（${arr.length} 首）\n${arr.join("\n")}\n\n` : "";
+  const prompt =
+`你是资深的漫剧 BGM / 音效选曲师。下面是我的私人音乐库清单——文件名就是每首歌的"名片"：
+命名规则「${nameRule}（同组标签用·连接，组间用-连接）_编号.扩展名」，括号里是时长，备注是我的听后感。
+
+${section("音乐", byKind.music)}${section("音效", byKind.sfx)}${section("环境底噪", byKind.ambient)}## 我的剧情 / 分镜需求
+${scene || "（这次没有具体剧情。请根据清单里的标签分布，给我一份「常见漫剧场景 × 该备什么曲」的建议表，并指出库的短板，比如缺哪类情绪的曲子。）"}
+
+## 你要做的事
+1. 为每个场景 / 情绪需求从我库里挑 1-2 首，只能从上面清单里挑，不要编造不存在的文件名
+2. 用 Markdown 表格回答，三列：场景 | 选曲文件名（完整照抄） | 一句话理由
+3. 某类需求库里没有合适的就直说缺什么（比如"缺葬礼用的庄严曲"），我好去补货
+4. 配乐从「音乐」清单挑，打斗声/脚步声这类音效从「音效」清单挑
+
+（清单共 ${usable} 首：音乐 ${byKind.music.length} · 音效 ${byKind.sfx.length} · 底噪 ${byKind.ambient.length}${unlabeled ? `；另有 ${unlabeled} 首还没打标签，不在清单里` : ""}。由捞鱼打标工具生成）`;
+  $("aiPromptOut").value = prompt;
+  $("aiStat").textContent = `已生成：${usable} 首可用（音乐 ${byKind.music.length} · 音效 ${byKind.sfx.length} · 底噪 ${byKind.ambient.length}）`;
+  log("ok", "AI 选曲", `生成提示词：可用 ${usable} 首，剧情 ${scene ? "已附" : "未填（通用模板）"}`);
+}
+$("btnAiPick").addEventListener("click", openAiPick);
+$("aiClose").addEventListener("click", () => $("dlgAiPick").close());
+$("aiGen").addEventListener("click", buildAiPickPrompt);
+$("aiCopy").addEventListener("click", async () => {
+  const text = $("aiPromptOut").value;
+  if (!text) { toast("先点「✨ 生成」", true); return; }
+  try { await navigator.clipboard.writeText(text); toast("已复制！去粘贴给任意 AI（Kimi / ChatGPT / 豆包…）", false, "cheer.png"); }
+  catch (e) { toast("复制失败，请在框里手动全选复制", true); }
+});
+
+/* ── 手动模式提示：直接双击 index.html 打开的，告诉他差了什么 ── */
+if (location.protocol === "file:") {
+  $("liteBanner").style.display = "flex";
+  log("info", "启动", "检测到手动模式（file:// 打开）：无自动同步、数据仅存浏览器");
+}
+$("liteHelpBtn").addEventListener("click", () => openHelp(1));
+
+/* ══════════════ 启动 ══════════════ */
 function renderAll() {
   renderList(); renderProgress(); renderTagPanel(); renderTagFilters(); renderNowName();
 }
@@ -2817,6 +3216,9 @@ if (restored && state.order.length) {
   toast(`恢复了上次会话：${state.order.length} 首（重新「添加目录」后才能播放）`, false, "happy.png");
 }
 log("info", "启动", `捞鱼打标工具启动 · 恢复 ${restored ? state.order.length + " 首" : "空库"}`);
+
+// 新手向导：第一次打开自动播放（看完/跳过就不再打扰，帮助中心可重看）
+if (!localStorage.getItem(LS_KEY_ONBOARD)) setTimeout(showOnboard, 700);
 </script>
 </body>
 </html>
