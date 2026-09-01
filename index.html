@@ -682,7 +682,7 @@
   <span id="dbStatus">未绑定 — 数据只存浏览器本地</span>
   <span class="spacer"></span>
   <button class="btn bouncy" id="btnAiTag" title="根据备注文本自动补标签（增量，不覆盖已有标签）">✨ 备注打标</button>
-  <button class="btn bouncy" id="btnRename" title="把已打标项目在列表里的名称一键更新为标准命名（格式同整理导出；内部 ID 不变，不影响同步）">🏷️ 一键更新名称</button>
+  <button class="btn bouncy" id="btnRename" title="命名规则：有草稿原名的用「原名-标签_哈希」（放不下就「原名_哈希」），没有原名的用「标签_哈希」；后来才认出原名的会自动顶掉旧标签名">🏷️ 一键更新名称</button>
   <button class="btn bouncy" id="btnCleanup" title="清理失效文件（本地已不存在的）+ 合并重复记录（超级导入产生的两份标签）">🧹 数据清理</button>
   <button class="btn primary bouncy" id="btnOrganize" title="把已打标文件按标准名复制到指定文件夹">📦 整理导出</button>
   <button class="btn moss bouncy" id="btnSuperImport" title="导入「整理导出」产出的完整素材包（音乐/音效/Json 三件套）">🚀 超级导入</button>
@@ -985,7 +985,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.14.1";
+const APP_VERSION = "2.14.2";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -2153,7 +2153,20 @@ function stdNameFor(r, t) {
   const key = hashKeyFor(r);
   const hash8 = key ? key.slice(0, 8) : ((r.id || "").split("_").pop() || "x").slice(-8);
   const ext = (t && t.file.match(/\.[^.]+$/)?.[0]) || ".mp3";
-  if (parts.length) return parts.join("-") + "_" + hash8 + ext;
+  const tagStr = parts.join("-");
+  // 有草稿原名（如"风铃古风转场"）：原名打头——放得下就追加打标信息（原名-标签_哈希），
+  // 放不下（文件名全长 >120 字符，给路径留余量）就降级为 原名_哈希；后来才认出的原名
+  // 会在下次「一键更新名称/导出」时自然顶掉旧的标签名。没原名的维持标签标准名。
+  const title = t && t.meta && t.meta.title ? t.meta.title.replace(/[\\/:*?"<>|]/g, "").slice(0, 80) : "";
+  const budget = 120 - ext.length; // 文件名（不含扩展名）的字符预算
+  if (title) {
+    if (title.length + 1 + tagStr.length + 1 + hash8.length <= budget)
+      return `${title}${tagStr ? "-" + tagStr : ""}_${hash8}${ext}`;
+    if (title.length + 1 + hash8.length <= budget)
+      return `${title}_${hash8}${ext}`;
+    return `${title.slice(0, budget - hash8.length - 1)}_${hash8}${ext}`; // 原名本身就超长：截原名保哈希
+  }
+  if (parts.length) return tagStr + "_" + hash8 + ext;
   if (r.note) {
     const snippet = r.note.slice(0, 12).replace(/[\\/:*?"<>|]/g, "");
     return `备注-${snippet}_${hash8}${ext}`;
@@ -2346,7 +2359,7 @@ $("btnRename").addEventListener("click", () => {
       renamed++;
     }
   }
-  log("ok", "一键更新名称", `${renamed ? renamed + " 个项目已更新为标准命名" : "名称都已是最新的"}（内部 ID 未动）`);
+  log("ok", "一键更新名称", `${renamed ? renamed + " 个项目已更新为标准命名（有原名的用「原名-标签_哈希」，放不下就「原名_哈希」）" : "名称都已是最新的"}（内部 ID 未动）`);
   renderAll();
   scheduleSave("一键更新名称");
   toast(renamed ? `已把 ${renamed} 个项目更新为标准命名 🏷️（ID 不变，同步不受影响）` : "名称都是最新的，不用更新", false, "cheer.png");
