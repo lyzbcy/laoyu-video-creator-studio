@@ -240,6 +240,7 @@ function readAudioDuration(p, fmt, size, mtime) {
 function buildManifest() {
   if (manifestCache && Date.now() - manifestAt < 10000) return manifestCache;
   const dirs = discoverMusicDirs();
+  const draftMeta = scanDraftMeta().byHash; // 哈希 → {title 原名, author 作者, vip, mid 曲目ID, type}
   const userDirs = loadUserDirs(); // {dir, kind}：手动注册的常驻目录，kind 视为用户确认过
   const userPaths = new Set(userDirs.map(u => u.dir));
   const kindByDir = new Map(userDirs.map(u => [u.dir, u.kind || "music"]));
@@ -263,6 +264,14 @@ function buildManifest() {
         counts[di]++;
         const fmt = sniffFmt(p, m[1].toLowerCase());
         const pkgKind = PKG_KIND[path.basename(dir)]; // 素材包子目录（音乐/音效/环境底噪）名即类型
+        // 草稿元数据：原名/作者/VIP（能认出来多少取决于剪映草稿留了多少明文）
+        const dm = draftMeta[base];
+        const meta = dm && (dm.title || dm.author) ? {
+          title: dm.title || undefined,
+          author: dm.author || undefined,
+          vip: dm.vip === "1" || undefined,
+          mid: dm.mid || undefined,
+        } : undefined;
         seen.set(base, {
           name: f,
           fmt,
@@ -270,6 +279,7 @@ function buildManifest() {
           duration: readAudioDuration(p, fmt, st.size, st.mtimeMs), // 秒；供前端自动分类音乐/音效
           kind: kindByDir.get(dir) || pkgKind || "music",
           kindManual: isUser || pkgKind ? true : undefined, // 注册目录/素材包分类视为确认过，前端不再按时长改判
+          meta,
           url: "/music/" + encodeURIComponent(f),
           dir: di, // 来自哪个目录（前端多位置选择用）
         });
@@ -342,6 +352,137 @@ async function handleFeedback(req, res) {
     reply({ ok: true });
   } catch (e) {
     reply({ ok: false, error: String(e.message || e).slice(0, 200) });
+  }
+}
+
+/* ── 剪映草稿元数据：把缓存里的哈希乱码还原成「原名 · 作者 · VIP」 ──────
+   明文源（草稿正文新版加密，这三处是仅存的明文）：
+     1) Timelines 各分段下的 template.json.bak，其 materials.audios[]：
+        path（哈希文件名）↔ name（原名）↔ effect_id（曲目ID）↔ type
+     2) key_value.json：materialId（曲目ID）→ is_vip / 分类 / 搜索词
+     3) materials/audio/ 素材池（哈希命名，无名字，只是佐证文件在）
+   产物落 draft-meta.json（含作者缓存），5 分钟重扫；作者用曲目ID问抖音音乐页，
+   慢慢补（每轮最多查 3 首防限流），查不到留空。 */
+const DRAFT_META_FILE = path.join(TOOL_DIR, "draft-meta.json");
+let _draftMeta = null, _draftMetaAt = 0;
+const HEX32RE = /^[0-9a-f]{32}$/i;
+
+function loadDraftMeta() {
+  if (_draftMeta) return _draftMeta;
+  try { _draftMeta = JSON.parse(fs.readFileSync(DRAFT_META_FILE, "utf8")); } catch (e) {}
+  if (!_draftMeta || typeof _draftMeta !== "object") _draftMeta = { scanned_at: 0, byHash: {}, byMid: {} };
+  if (!_draftMeta.byHash) _draftMeta.byHash = {};
+  if (!_draftMeta.byMid) _draftMeta.byMid = {};
+  return _draftMeta;
+}
+function saveDraftMeta() {
+  try { fs.writeFileSync(DRAFT_META_FILE, JSON.stringify(_draftMeta), "utf8"); } catch (e) {}
+}
+function readJsonIfPlain(p) {
+  try {
+    const fd = fs.openSync(p, "r");
+    const buf = Buffer.alloc(1);
+    fs.readSync(fd, buf, 0, 1, 0);
+    fs.closeSync(fd);
+    if (buf[0] !== 0x7b && buf[0] !== 0x5b) return null; // 加密草稿不是 { 开头
+    return JSON.parse(fs.readFileSync(p, "utf8"));
+  } catch (e) { return null; }
+}
+function scanDraftMeta() {
+  const meta = loadDraftMeta();
+  if (Date.now() - _draftMetaAt < 300000) return meta; // 5 分钟重扫
+  _draftMetaAt = Date.now();
+  const base = path.join(process.env.LOCALAPPDATA || "", "JianyingPro", "User Data", "Projects");
+  let roots = [];
+  try { roots = fs.readdirSync(base).filter(n => /^com\.lveditor\.(cloud\.)?draft/.test(n)).map(n => path.join(base, n)); } catch (e) {}
+  const byHash = {}, byMid = {};
+  for (const root of roots) {
+    let drafts = [];
+    try { drafts = fs.readdirSync(root).filter(n => !n.startsWith(".")).map(n => path.join(root, n)); } catch (e) { continue; }
+    for (const ddir of drafts) {
+      // 1) 时间轴明文快照：哈希 ↔ 原名 ↔ 曲目ID ↔ 类型
+      const tjPaths = [];
+      try { for (const seg of fs.readdirSync(path.join(ddir, "Timelines"))) tjPaths.push(path.join(ddir, "Timelines", seg, "template.json.bak")); } catch (e) {}
+      tjPaths.push(path.join(ddir, "draft_content.json"));
+      for (const tj of tjPaths) {
+        const d = readJsonIfPlain(tj);
+        if (!d) continue;
+        for (const a of (d.materials && d.materials.audios) || []) {
+          const m = /([0-9a-f]{32})\.(?:mp3|m4a|wav)$/i.exec((a.path || "").replace(/\\/g, "/"));
+          if (!m || /\/video\//i.test(a.path || "")) continue;
+          const h = m[1].toLowerCase();
+          const mid = String(a.effect_id || a.resource_id || "");
+          const cur = byHash[h] || (byHash[h] = { title: "", mid: "", type: "", vip: "", drafts: [] });
+          if (!cur.title && a.name) cur.title = String(a.name).slice(0, 80);
+          if (!cur.mid && mid) cur.mid = mid;
+          if (!cur.type && a.type) cur.type = a.type === "music" ? "music" : a.type === "sound" ? "sound_effect" : String(a.type).slice(0, 20);
+          if (cur.drafts.length < 3 && !cur.drafts.includes(path.basename(ddir))) cur.drafts.push(path.basename(ddir));
+          if (mid && !byMid[mid]) byMid[mid] = { title: cur.title || "", vip: "", kw: "" };
+        }
+      }
+      // 2) key_value.json：曲目ID → VIP / 分类 / 搜索词（比时间轴更全，但没哈希）
+      const kv = readJsonIfPlain(path.join(ddir, "key_value.json"));
+      if (kv) {
+        for (const v of Object.values(kv)) {
+          if (!v || typeof v !== "object" || v.materialCategory !== "audio" || !v.materialId) continue;
+          const mid = String(v.materialId);
+          const cur = byMid[mid] || (byMid[mid] = { title: "", vip: "", kw: "" });
+          if (!cur.title && v.materialName) cur.title = String(v.materialName).slice(0, 80);
+          if (v.is_vip !== undefined) cur.vip = String(v.is_vip) === "1" ? "1" : "0";
+          if (!cur.kw && v.searchKeyword) cur.kw = String(v.searchKeyword).slice(0, 40);
+        }
+      }
+    }
+  }
+  // 交叉补全：哈希侧缺的 vip/title 用曲目ID侧补；保留上一轮已查到的 author
+  const oldByHash = meta.byHash || {};
+  for (const [h, cur] of Object.entries(byHash)) {
+    const m = cur.mid ? byMid[cur.mid] : null;
+    if (m) {
+      if (!cur.title && m.title) cur.title = m.title;
+      if (m.vip) cur.vip = m.vip;
+      cur.kw = m.kw || "";
+    }
+    const old = oldByHash[h];
+    cur.author = (old && old.author) || ""; // 作者缓存不丢
+    cur.author_tried = (old && old.author_tried) || false;
+  }
+  meta.byHash = byHash;
+  meta.byMid = byMid;
+  meta.scanned_at = Date.now();
+  _draftMeta = meta;
+  saveDraftMeta();
+  const n = Object.keys(byHash).length;
+  if (n) console.log(`草稿元数据：认出 ${n} 首的原名（明文快照覆盖有限，剪映新版草稿正文加密）`);
+  return meta;
+}
+
+/* 作者慢查询：每轮最多 3 首、每首 8 秒超时，结果进缓存不再查 */
+async function authorLookupLoop() {
+  for (;;) {
+    await new Promise(r => setTimeout(r, 15000));
+    try {
+      const meta = scanDraftMeta();
+      const todo = Object.entries(meta.byHash)
+        .filter(([h, v]) => v.mid && !v.author && !v.author_tried)
+        .slice(0, 3);
+      for (const [h, v] of todo) {
+        try {
+          const r = await fetch("https://www.douyin.com/music/" + v.mid, {
+            headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36" },
+            signal: AbortSignal.timeout(8000),
+          });
+          const html = await r.text();
+          let m = /\\?"musicDetail\\":\{.*?\\?"author\\?":\\?"([^"\\]{1,60})/.exec(html);
+          if (!m) m = /\\?"author\\?":\\?"([^"\\]{1,60})/.exec(html);
+          v.author = m ? m[1].trim() : "";
+          if (v.author) console.log(`作者查到：${v.title || h.slice(0, 8)} ← ${v.author}`);
+        } catch (e) { v.author = ""; }
+        v.author_tried = true;
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      if (todo.length) { saveDraftMeta(); manifestAt = 0; } // 让 manifest 带上新作者
+    } catch (e) { /* 循环永不退出 */ }
   }
 }
 
@@ -682,6 +823,8 @@ server.listen(PORT, "127.0.0.1", () => {
   discoverMusicDirs().forEach(d => console.log("  - " + d));
   console.log("剪映里新缓存的音乐，最迟 10 秒后自动出现在工具里（页面开着每分钟自动同步，重开页面立即同步）。");
   console.log("关掉这个黑窗口 = 关闭工具服务器。");
+  scanDraftMeta();          // 草稿元数据先扫一轮（原名/VIP/曲目ID 立即可用）
+  authorLookupLoop();       // 作者慢查询在后台慢慢补（每轮 3 首，查过的不再查）
   // 自动打开浏览器
   const { exec } = require("child_process");
   exec(`start "" "${url}"`);

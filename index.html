@@ -288,6 +288,12 @@
     white-space: nowrap;
     color: var(--ink-soft);
   }
+  .track .name.titled { font-family: inherit; font-size: 12px; } /* 有草稿原名时用正文字体，不再是哈希码风格 */
+  .track .vipTag { font-size: 11px; flex-shrink: 0; }
+  .track .authorTag {
+    font-size: 10.5px; color: var(--ink-faint); flex-shrink: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px;
+  }
   .track.current .name { color: var(--ink); font-weight: 600; }
   .track .preview-tags {
     font-size: 10px;
@@ -979,7 +985,7 @@ const LS_KEY_LOGO = "laoyu_tagger_logo";
 const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
-const APP_VERSION = "2.13.2";
+const APP_VERSION = "2.14.0";
 const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
 
 const DEFAULT_GROUPS = [
@@ -1032,6 +1038,7 @@ const state = {
 
 const $ = id => document.getElementById(id);
 const audio = $("audio");
+const escHtml = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 /* ══════════════ 日志系统 ══════════════ */
 
@@ -1586,7 +1593,8 @@ function renderNowName() {
   if (!t) { el.innerHTML = `还没有选中音频，先从左边挑一首吧 <span class="fmt"></span>`; return; }
   const fake = t.file.toLowerCase().endsWith(".mp3") && t.fmt === "m4a";
   const kindText = t.kind === "sfx" ? "🔊音效" : t.kind === "ambient" ? "🌫️底噪" : "🎵音乐";
-  el.innerHTML = `${t.displayName || t.file}` +
+  const meta = t.meta || {};
+  el.innerHTML = `${escHtml(meta.title || t.displayName || t.file)}${meta.vip ? ' <span class="vipTag" title="VIP 曲目">👑</span>' : ""}${meta.author ? `<span class="fmt">· ${escHtml(meta.author)}</span>` : ""}` +
     `<span class="fmt">${kindText} · ${t.fmt.toUpperCase()}${fake ? "（扩展名伪装已纠正）" : ""}${t.duration ? " · " + fmtTime(t.duration) : ""}</span>`;
   // 角落贴纸随类型换心情
   $("cornerSticker").src = t.kind === "sfx" ? "assets/stickers/hmm.png" : t.kind === "ambient" ? "assets/stickers/sleepy.png" : "assets/stickers/wave.png";
@@ -1745,8 +1753,9 @@ function visibleIds() {
     const r = state.records[id];
     const t = state.tracks[id];
     const inName = (t.displayName || id).toLowerCase().includes(q) || id.toLowerCase().includes(q);
+    const inMeta = !!(t.meta && ((t.meta.title || "").toLowerCase().includes(q) || (t.meta.author || "").toLowerCase().includes(q))); // 原名/作者搜索：草稿元数据认出来的歌能按真名搜到
     const inNote = r && r.note && r.note.toLowerCase().includes(q); // 备注搜索：辅助选曲
-    return inName || inNote;
+    return inName || inMeta || inNote;
   });
   if (state.filter === "labeled") ids = ids.filter(isLabeled);
   else if (state.filter === "unlabeled") ids = ids.filter(id => !isLabeled(id));
@@ -1843,9 +1852,16 @@ function renderList() {
     const preview = r ? Object.values(r.tags).flat().slice(0, 4).join("·") : "";
     const statusIcon = !alive ? "💤" : isLabeled(id) ? "✅" : "⬜";
     div.title = alive ? "" : "文件不在本地（来自上次会话）：启动服务器/添加目录可恢复，或点「🧹 数据清理」移除";
+    // 名字显示优先级：草稿认出的原名 > 标准命名 > 哈希；作者与 VIP 随行，哈希全名放 tooltip
+    const m = t.meta || {};
+    if (alive && (m.title || m.author || m.vip)) {
+      div.title = (m.title || "") + (m.author ? " · " + m.author : "") + (m.vip ? " · VIP" : "") + (m.title ? "\n" + (t.displayName || t.file) : "");
+    }
     div.innerHTML = (state.selectMode ? `<input type="checkbox" class="selCb" ${state.selectedIds && state.selectedIds.has(id) ? "checked" : ""}>` : `<span class="status">${statusIcon}</span>`) +
       `<span class="kindBadge ${t.kind || "music"}">${t.kind === "sfx" ? "音效" : t.kind === "ambient" ? "底噪" : "音乐"}</span>` +
-      `<span class="name">${t.displayName || t.file}</span>` +
+      `<span class="name${m.title ? " titled" : ""}">${escHtml(m.title || t.displayName || t.file)}</span>` +
+      (m.vip ? `<span class="vipTag" title="VIP 曲目（来自剪映草稿记录）">👑</span>` : "") +
+      (m.author ? `<span class="authorTag">· ${escHtml(m.author)}</span>` : "") +
       (preview ? `<span class="preview-tags">${preview}</span>` : "") +
       (state.selectMode ? "" : `<span class="dur">${t.duration ? fmtTime(t.duration) : ""}</span><button class="rowDel" title="从工具里移除（文件不删，可反悔）">🗑</button>`);
     div.onclick = e => {
@@ -2879,6 +2895,7 @@ async function syncFromServer(first, forceChoose = false) {
       if (state.tracks[base2]) {
         const t = state.tracks[base2];
         if (!t._file && !t.url) { t.url = url; if (f.fmt) t.fmt = f.fmt; }
+        if (f.meta) t.meta = f.meta; // 草稿元数据（原名/作者/VIP）认出来了就更新
         // 旧数据升级：还没判过类型且这次有时长 → 自动判一次
         if (applyAutoKind(t, f.duration)) { kindFixed++; if (state.records[base2]) state.records[base2].kind = t.kind; }
         continue;
@@ -2887,6 +2904,7 @@ async function syncFromServer(first, forceChoose = false) {
         id: base2, file: f.name,
         kind: f.kind || "music", kindSource: f.kindManual ? "manual" : null,
         fmt: f.fmt || "", size: f.size || 0, duration: f.duration || null,
+        meta: f.meta || null,
         _file: null, url,
       };
       applyAutoKind(nt, f.duration); // 入库即判（一次）
@@ -3105,6 +3123,7 @@ const HELP_CHAPTERS = [
     <p><b>自动档（强烈推荐）</b>：用文件夹里的「启动打标工具.bat」打开工具。之后你在剪映里新听 / 新下载的音乐，<b>最迟 1 分钟自动出现</b>在列表里，啥都不用点。</p>
     <p><b>手动档</b>：顶部「⤵ 一键同步剪映缓存」选一次缓存文件夹；或者「🎵 加音乐目录 / 🔊 加音效目录」添加自己的文件夹（工具会记住，重启自动恢复）。</p>
     <p><b>搬家档</b>：拿到同事的素材包？「🚀 超级导入」选中整个文件夹，音频 + 标签整包还原。</p>
+    <div class="tip">💡 部分歌的列表名不是乱码哈希，而是<b>原名</b>（还带 👑VIP 标记）：工具会读剪映草稿里的明文记录认出它们。能认出多少取决于剪映——新版草稿正文加密，只有部分明文留存；你剪的片子越多、上过时间轴的音乐越多，认出来的就越多。鼠标悬停能看到原哈希名。</div>
     <div class="warn">🌫️ 如果你现在是直接双击 index.html 打开的（页面顶部有蓝条提示），那就是手动档——想要自动档，关掉页面去工具文件夹双击「启动打标工具.bat」。</div>
     <h5>启动时那个黑窗口是什么？</h5>
     <p>那是工具的<b>发动机</b>。开着它（最小化没关系）才有自动同步；点它右上角 × = 收工下班。找不到窗口时，双击「停止打标工具.bat」也能按端口把它找出来关掉。</p>` },

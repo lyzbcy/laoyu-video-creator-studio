@@ -3,3 +3,4 @@ user-dirs.json
 feedback-webhook.txt
 bgm_library.jsonl
 .playwright-cli/
+draft-meta.json
