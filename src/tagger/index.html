@@ -690,6 +690,8 @@
   <button class="btn bouncy" id="btnCleanup" title="清理失效文件（本地已不存在的）+ 合并重复记录（超级导入产生的两份标签）">🧹 数据清理</button>
   <button class="btn primary bouncy" id="btnOrganize" title="把已打标文件按标准名复制到指定文件夹">📦 整理导出</button>
   <button class="btn moss bouncy" id="btnSuperImport" title="导入「整理导出」产出的完整素材包（音乐/音效/Json 三件套）">🚀 超级导入</button>
+  <button class="btn bouncy" id="btnRestoreTitles" type="button">恢复剪映曲名</button>
+  <span id="titleRecoveryStatus" class="muted" role="status"></span>
   <button class="btn moss bouncy" id="btnAiPick" title="标签攒够了？把整份音乐清单交给 AI，让它按你的剧情挑歌">🤖 AI 选曲</button>
   <button class="btn bouncy" id="btnFeedback" title="用着不顺手、有想法，直接写给捞鱼——点一下就送达">💬 反馈</button>
   <button class="btn bouncy" id="btnLog">📒 日志</button>
@@ -1239,6 +1241,10 @@ function buildJSONLText() {
 }
 
 let desktopSave = Promise.resolve(), desktopToken;
+async function getDesktopToken() {
+  if (!desktopToken) desktopToken=(await (await fetch("/api/projects")).json()).token;
+  return desktopToken;
+}
 async function saveDesktopDatabase(reason) {
   const changes = [];
   const saved = new Map();
@@ -1255,11 +1261,7 @@ async function saveDesktopDatabase(reason) {
   if (!changes.length && !groups) return;
   try {
     if (!state._desktopDb.online) throw new Error("旧数据库暂时无法读取，修改已留在本机。");
-    if (!desktopToken) {
-      const session = await fetch("/api/projects");
-      desktopToken = (await session.json()).token;
-    }
-    const response = await fetch("/api/bgm/database", {method:"POST",headers:{"Content-Type":"application/json","X-Board-Token":desktopToken},
+    const response = await fetch("/api/bgm/database", {method:"POST",headers:{"Content-Type":"application/json","X-Board-Token":await getDesktopToken()},
       body:JSON.stringify({changes,groups})});
     const result = await response.json();
     if (!response.ok) {
@@ -2247,15 +2249,15 @@ function stdNameFor(r, t) {
 
 $("btnOrganize").addEventListener("click", async () => {
   if (!window.showDirectoryPicker) { toast("此浏览器不支持选择导出文件夹，请用 Edge/Chrome", true); return; }
-  const labeled = Object.values(state.records).filter(r => isLabeled(r.id) && state.tracks[r.id] && !r.excluded);
-  if (!labeled.length) { toast("还没有已打标的音频，先打几首再整理", true, "sleepy.png"); return; }
+  const labeled=exportableRecords();
+  if (!labeled.length) { toast("还没有带标签或剪映曲名的音频", true, "sleepy.png"); return; }
   const withFile = labeled.filter(r => state.tracks[r.id]._file || state.tracks[r.id].url);
   const byKind = k => withFile.filter(r => (r.kind || "music") === k).length;
   $("orgPreview").innerHTML =
     `将导出完整素材包到你选的文件夹：<br>` +
     `├ 🎵 音乐/ <b>${byKind("music")}</b> 首　├ 🔊 音效/ <b>${byKind("sfx")}</b> 首　├ 🌫️ 环境底噪/ <b>${byKind("ambient")}</b> 首<br>` +
     `└ 📄 bgm_library.json（标签数据，ID 已同步为重命名后的新名，可「🚀 超级导入」还原）<br>` +
-    `命名格式：<code>情绪标签-场景标签-剧情标签_哈希前8位.扩展名</code><br>` +
+    `命名使用剪映原曲名、已有标签和短 ID<br>` +
     `<span style="color:var(--ink-faint);font-size:12px">只复制不改原文件；同名已存在会跳过。${labeled.length - withFile.length ? `${labeled.length - withFile.length} 首需要重新添加目录后才能导出。` : ""}</span>`;
   const dlg = $("dlgOrganize");
   dlg.showModal();
@@ -2998,6 +3000,9 @@ async function syncFromServer(first, forceChoose = false) {
       if (legacy.groups && !state.desktopGroupsDirty) state.desktopGroupsBase=legacy.groups;
     }
     updateDbStatus();
+    for (const [id,meta] of Object.entries(data.titleHints||{})) {
+      if (state.tracks[id]) state.tracks[id].meta=meta;
+    }
     // 多缓存位置：自动同步 = 发现的全部有音频位置都同步（发现即同步，新目录自动进来，
     // 绝不因记忆失效卡死或漏目录）；只有用户主动点「一键同步」才弹选择框做过滤，
     // 选择结果只作为下次弹窗的预勾选。曾因 remembered 过滤把同步挂死/漏新目录，整库 💤。
@@ -3048,6 +3053,7 @@ async function syncFromServer(first, forceChoose = false) {
         if (state.records[hid] && state.records[hid].excluded) continue;
         const ht = state.tracks[hid];
         if (ht) {
+          if (f.meta) ht.meta=f.meta;
           if (!ht._file && !ht.url) {
             ht.url = f.url || url; ht.fmt = f.fmt || ht.fmt; ht.size = f.size || ht.size;
             ht.duration ||= f.duration; rebinded++;
@@ -3095,6 +3101,7 @@ async function syncFromServer(first, forceChoose = false) {
       const available = labeled.filter(item=>state.tracks[item.id]?.url || state.tracks[item.id]?._file).length;
       legacyStatus.textContent = `旧标签库${legacy.managed?"":"（只读）"} · ${labeled.length} 条已打标 · ${available} 条有音源`;
     }
+    $("titleRecoveryStatus").textContent=`当前曲库 ${state.order.filter(id=>titleHint(state.tracks[id])).length} 首有剪映曲名`;
     if (first) {
       log("info", "服务器模式", `载入 ${added} 首` + (kindFixed ? `，按时长自动分类 ${kindFixed} 首` : "") + (rebinded ? `，认回导出包文件 ${rebinded} 首` : "") + (pruned ? `，清掉幽灵条目 ${pruned} 个` : ""));
       toast(`载入 ${added} 首${kindFixed ? `，自动分好 ${kindFixed} 首的类型` : ""}${rebinded ? `，认回 ${rebinded} 首导出包文件` : ""}${pruned ? `，清掉 ${pruned} 个幽灵条目` : ""}`, false, "wave.png");
@@ -3376,6 +3383,32 @@ $("helpBody").addEventListener("click", e => {
 });
 
 /* ── AI 选曲：把"音乐清单 + 剧情"打包成提示词，交给任意 AI 挑歌 ── */
+function titleHint(track) {
+  const meta=track?.meta;
+  return meta?.titleSource==="jianying-draft" && meta.title
+    ? {value:meta.title,source:"jianying-draft",weight:0.35} : null;
+}
+function exportableRecords() {
+  return state.order.flatMap(id=>{
+    const track=state.tracks[id], record=state.records[id];
+    if (record?.excluded || (!isLabeled(id) && !titleHint(track))) return [];
+    return [record||{id,file:track.file,kind:track.kind,tags:{},duration:track.duration}];
+  });
+}
+$("btnRestoreTitles").addEventListener("click",async()=>{
+  const button=$("btnRestoreTitles");
+  button.disabled=true;
+  $("titleRecoveryStatus").textContent="正在读取本机剪映草稿…";
+  try {
+    const response=await fetch("/api/bgm/titles",{method:"POST",headers:{"X-Board-Token":await getDesktopToken()}});
+    const result=await response.json();
+    if(!response.ok) throw new Error(result.error);
+    await syncFromServer(false);
+    toast(result.configured?`已检查 ${result.drafts} 份草稿，建立 ${result.titles} 条曲名映射`:
+      "已同步明文草稿曲名，此设备尚未配置加密草稿读取组件。",false,"cheer.png");
+  } catch(error) {$("titleRecoveryStatus").textContent=error.message;toast(error.message,true);}
+  finally {button.disabled=false;}
+});
 function openAiPick() {
   $("aiStat").textContent = "";
   $("dlgAiPick").showModal();
@@ -3388,33 +3421,34 @@ function fmtDur(sec) {
 function buildAiPickPrompt() {
   const scene = $("aiScene").value.trim();
   const byKind = { music: [], sfx: [], ambient: [] };
-  let total = 0, unlabeled = 0;
+  let total=0, omitted=0, titleOnly=0;
   for (const id of state.order) {
-    const t = state.tracks[id];
-    const r = state.records[id];
-    if (!t || (r && r.excluded)) continue;
+    const track=state.tracks[id], record=state.records[id];
+    if (!track || record?.excluded) continue;
     total++;
-    const labeled = r && (Object.values(r.tags || {}).some(a => a && a.length) || (r.note || "").trim());
-    if (!labeled) { unlabeled++; continue; }
-    const kind = (r && r.kind) || t.kind || "music";
-    (byKind[kind] || byKind.music).push(
-      "- " + stdNameFor(r, t) +
-      (fmtDur(t.duration || (r && r.duration)) ? "（" + fmtDur(t.duration || (r && r.duration)) + "）" : "") +
-      ((r.note || "").trim() ? " 备注：" + r.note.trim().slice(0, 40) : "")
+    const manual=isLabeled(id), hint=titleHint(track);
+    if (!manual && !hint) {omitted++;continue;}
+    if (!manual) titleOnly++;
+    const row=record||{id,file:track.file,kind:track.kind,tags:{}};
+    const duration=fmtDur(track.duration||row.duration);
+    const tags=Object.values(row.tags||{}).flat();
+    (byKind[row.kind]||byKind.music).push(
+      `- ${stdNameFor(row,track)}${duration?`（${duration}）`:""}〔ID ${id}〕${trackAlive(track)?"":"〔音源缺失〕"}`+
+      (tags.length?` · 人工标签(1.0) ${tags.join("、")}`:"")+
+      (row.note?` · 人工备注(1.0) ${row.note.trim().slice(0,80)}`:"")+
+      (hint?` · 剪映曲名(${hint.weight}) ${hint.value}`:"")
     );
   }
   const usable = byKind.music.length + byKind.sfx.length + byKind.ambient.length;
   if (!usable) {
     $("aiPromptOut").value = "";
-    $("aiStat").textContent = `库里 ${total} 首都还没打过标签`;
-    toast("先打几首标签（或写点备注），AI 才有得挑～", true, "sleepy.png");
+    $("aiStat").textContent = `库里 ${total} 首暂无人工标签、备注或已恢复曲名`;
+    toast("先恢复曲名，或补一些标签和备注再选曲。", true, "sleepy.png");
     return;
   }
-  const nameRule = state.groups.map(g => g.name + "标签").join(" - ");
   const section = (title, arr) => arr.length ? `## ${title}（${arr.length} 首）\n${arr.join("\n")}\n\n` : "";
   const prompt =
-`你是资深的漫剧 BGM / 音效选曲师。下面是我的私人音乐库清单——文件名就是每首歌的"名片"：
-命名规则「${nameRule}（同组标签用·连接，组间用-连接）_编号.扩展名」，括号里是时长，备注是我的听后感。
+`你是资深的漫剧 BGM / 音效选曲师。下面是我的私人音乐库清单。人工标签和备注权重为 1.0，剪映曲名权重为 0.35。仅靠曲名的候选请标明「按曲名推测，需试听」，人工记录优先。曲名不能证明实际听感、曲速、段落或授权。
 
 ${section("音乐", byKind.music)}${section("音效", byKind.sfx)}${section("环境底噪", byKind.ambient)}## 我的剧情 / 分镜需求
 ${scene || "（这次没有具体剧情。请根据清单里的标签分布，给我一份「常见漫剧场景 × 该备什么曲」的建议表，并指出库的短板，比如缺哪类情绪的曲子。）"}
@@ -3423,9 +3457,9 @@ ${scene || "（这次没有具体剧情。请根据清单里的标签分布，�
 1. 为每个场景 / 情绪需求从我库里挑 1-2 首，只能从上面清单里挑，不要编造不存在的文件名
 2. 用 Markdown 表格回答，三列：场景 | 选曲文件名（完整照抄） | 一句话理由
 3. 某类需求库里没有合适的就直说缺什么（比如"缺葬礼用的庄严曲"），我好去补货
-4. 配乐从「音乐」清单挑，打斗声/脚步声这类音效从「音效」清单挑
+4. 配乐从「音乐」清单挑，音效从「音效」清单挑。实际要用的候选跳过标为「音源缺失」的条目。
 
-（清单共 ${usable} 首：音乐 ${byKind.music.length} · 音效 ${byKind.sfx.length} · 底噪 ${byKind.ambient.length}${unlabeled ? `；另有 ${unlabeled} 首还没打标签，不在清单里` : ""}。由捞鱼打标工具生成）`;
+（清单共 ${usable} 首：音乐 ${byKind.music.length} · 音效 ${byKind.sfx.length} · 底噪 ${byKind.ambient.length}；${titleOnly} 首仅按曲名候选${omitted ? `；另有 ${omitted} 首暂无线索` : ""}。由捞鱼打标工具生成）`;
   $("aiPromptOut").value = prompt;
   $("aiStat").textContent = `已生成：${usable} 首可用（音乐 ${byKind.music.length} · 音效 ${byKind.sfx.length} · 底噪 ${byKind.ambient.length}）`;
   log("ok", "AI 选曲", `生成提示词：可用 ${usable} 首，剧情 ${scene ? "已附" : "未填（通用模板）"}`);
@@ -3589,7 +3623,10 @@ log("info", "启动", `捞鱼打标工具启动 · 恢复 ${restored ? state.ord
 // 新手向导：第一次打开自动播放（看完/跳过就不再打扰，帮助中心可重看）
 if (window.top !== window) window.addEventListener("message", event => {
   if (event.source !== parent || event.origin !== location.origin || event.data?.type !== "studio-graph-source") return;
-  const rows = Object.values(state.records).filter(record => !record.excluded && isLabeled(record.id));
+  const rows=exportableRecords().map(row=>{
+    const hint=titleHint(state.tracks[row.id]);
+    return hint?{...row,titleHint:hint}:row;
+  });
   parent.postMessage({type:"studio-graph-source-result",id:event.data.id,rows},location.origin);
 });
 if (window.top === window && !localStorage.getItem(LS_KEY_ONBOARD)) setTimeout(showOnboard, 700);

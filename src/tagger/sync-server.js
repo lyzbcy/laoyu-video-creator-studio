@@ -5,10 +5,12 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const {createDraftTitles,titleLookup} = require("./draft-titles.js");
 const { readLegacyLibrary, saveLegacyDatabase } = require("./legacy-source.js");
 
 const TOOL_DIR = __dirname;
 const DATA_DIR = process.env.LAOYU_STUDIO_DATA;
+const titleIndex=createDraftTitles(DATA_DIR,()=>{manifestAt=0;});
 
 // 扫描目录：自动发现，不再写死。三路探测（结果缓存 5 分钟）：
 //   1) 默认位置：%LOCALAPPDATA%\JianyingPro\User Data\Cache\music
@@ -256,13 +258,15 @@ function readAudioDuration(p, fmt, size, mtime) {
 function buildManifest() {
   if (manifestCache && Date.now() - manifestAt < 10000) return manifestCache;
   const dirs = discoverMusicDirs();
-  const draftMeta = scanDraftMeta().byHash; // 哈希 → {title 原名, author 作者, vip, mid 曲目ID, type}
+  titleIndex.auto();
+  const names=titleLookup(scanDraftMeta().byHash,titleIndex.current());
   const userDirs = loadUserDirs(); // {dir, kind}：手动注册的常驻目录，kind 视为用户确认过
   const userPaths = new Set(userDirs.map(u => u.dir));
   const kindByDir = new Map(userDirs.map(u => [u.dir, u.kind || "music"]));
   // 素材包子目录名自带类型（自动发现/注册展开出来的 音乐/音效/环境底噪），视为导出时确认过的分类
   const PKG_KIND = { "音乐": "music", "音效": "sfx", "环境底噪": "ambient", "music": "music", "sfx": "sfx", "ambient": "ambient" };
   const old = legacyLibrary();
+  const legacyRows=new Map((old?.summary.records||[]).map(row=>[row.id,row]));
   const ordinary = new Set(dirs.concat(userMusicDirs()));
   const allDirs = [...new Set([...ordinary, ...(old?.dirs || [])])];
   const seen = new Map(); // 主文件名（去扩展名）-> {name, fmt, size, url, dir}
@@ -286,13 +290,7 @@ function buildManifest() {
         const fmt = sniffFmt(p, m[1].toLowerCase());
         const pkgKind = PKG_KIND[path.basename(dir)]; // 素材包子目录（音乐/音效/环境底噪）名即类型
         // 草稿元数据：原名/作者/VIP（能认出来多少取决于剪映草稿留了多少明文）
-        const dm = draftMeta[base];
-        const meta = dm && (dm.title || dm.author) ? {
-          title: dm.title || undefined,
-          author: dm.author || undefined,
-          vip: dm.vip === "1" || undefined,
-          mid: dm.mid || undefined,
-        } : undefined;
+        const meta=names.find(base,legacyRows.get(legacyId)?.source_id,legacyId);
         seen.set(base, {
           name: f,
           legacyId,
@@ -316,6 +314,10 @@ function buildManifest() {
     })),
     files: [...seen.values()],
     legacy: old?.summary,
+    titleHints: Object.fromEntries([...legacyRows.values()].flatMap(row=>{
+      const info=names.find(row.source_id,row.id);
+      return info?[[row.id,info]]:[];
+    })),
   });
   manifestAt = Date.now();
   return manifestCache;
@@ -716,3 +718,5 @@ module.exports = function handleTagger(req, res, pathname) {
 };
 
 module.exports.saveDatabase = saveDatabase;
+
+module.exports.restoreTitles = () => titleIndex.refresh();

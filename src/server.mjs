@@ -219,6 +219,10 @@ const server=http.createServer(async(req,res)=>{
       return tagger(req,res,route);
     }
     if (route.startsWith("/api/") && method==="POST" && req.headers["x-board-token"]!==token) throw err(403,"请刷新创作台后再操作。");
+    if (route==="/api/bgm/titles"&&method==="POST") {
+      if (!desktopKey) throw err(403,"请从桌面程序恢复剪映曲名。");
+      return reply(res,200,await tagger.restoreTitles());
+    }
     if (route==="/api/bgm/database"&&method==="POST") {
       if (!desktopKey) throw err(403,"请从桌面程序保存已绑定的数据库。");
       return reply(res,200,tagger.saveDatabase(await body(req,8*1024*1024)));

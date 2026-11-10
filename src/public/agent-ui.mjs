@@ -95,7 +95,7 @@ export function graphPage(initial) {
     const matches=sample=>terms.every(term=>sample.toLowerCase().includes(term));
     const tags=graph.tags.filter(tag=>!terms.length || matches(tag.key)).slice(0,24);
     const tag=graph.tags.find(tag=>tag.key===focus);
-    const clips=graph.tracks.filter(track=>(!tag || tag.tracks.includes(track.id)) && matches([track.title,track.note,...track.tags.map(tag=>tag.group+" "+tag.label)].join(" ")));
+    const clips=graph.tracks.filter(track=>(!tag || tag.tracks.includes(track.id)) && matches([track.title,track.titleHint?.value||"",track.note,...track.tags.map(tag=>tag.group+" "+tag.label)].join(" ")));
     const lookup=new Map(graph.tracks.map(track=>[track.id,track]));
     const rules=graph.insights.filter(rule=>matches([rule.scene,rule.kind,rule.reason,rule.cue].join(" ")) &&
       (!tag || rule.evidence.some(item=>tag.tracks.includes(item.track))));
@@ -112,13 +112,14 @@ export function graphPage(initial) {
           e("ul",{},...rule.evidence.map(item=>e("li",{},lookup.get(item.track)?.title+" · 「"+item.quote+"」")))))),
       e("section",{cls:"card"},e("h2",{},"关联曲目"),
         ...clips.slice(0,24).map(track=>e("details",{cls:"evidence-row"},e("summary",{},track.title),
-          e("p",{cls:"muted"},[track.kind,...track.tags.map(tag=>tag.label)].join(" · ")),track.note?e("p",{},track.note):null)),
+          e("p",{cls:"muted"},[track.kind,...track.tags.map(tag=>tag.label)].join(" · ")),track.note?e("p",{},track.note):null,
+          track.titleHint?e("p",{cls:"muted"},`剪映曲名线索 (${track.titleHint.weight}) · ${track.titleHint.value}`):null)),
         clips.length>24?e("p",{cls:"muted"},"已显示前 24 条，可继续按标签或搜索缩小范围。"):null));
   };
   query.oninput=()=>{focus="";redraw();};
   const payload=()=>({schema:1,revision:graph.revision,tracks:graph.tracks});
   const requireTracks=()=>{if(!graph.tracks.length)throw new Error("请先加入一份有标签或备注的曲库。");};
-  const guide=["根据我导出的 BGM 证据包内化用法。标签和备注是证据，场景和搭配是你的推断。",
+  const guide=["根据我导出的 BGM 证据包内化用法。标签和备注是人工证据（权重 1.0），场景和搭配是你的推断。曲名线索（权重 0.35）仅用于找待试听候选，不可单独作证据。",
     "优先分析叙事时机、音乐与音效叠放、哪里应留白、哪些情况下慎用。不要凭空补写听感、节拍或音源授权。",
     "只返回 JSON，保持 revision 不变。每条用法写场景、入点或切法、理由以及逐字引用的证据。搭配须至少引用两首。",
     '{"schema":1,"revision":"原 revision","insights":[{"scene":"人物登场","kind":"适合","cue":"揭示时进","reason":"说明依据","evidence":[{"track":"原 track.id","quote":"逐字引用的标签或备注片段"}]}]}',
@@ -141,7 +142,7 @@ export function graphPage(initial) {
           const queryText=query.value.trim();
           const pack={schema:1,revision:graph.revision,tags:graph.tags,insights:graph.insights,tracks:graph.tracks};
           saveJson("BGM-选曲图谱.json",pack);
-          await copy(`请结合随附 BGM 图谱，为「${queryText||"我给你的分镜"}」挑选 BGM 和音效。注明适用镜头、进出点、降音量或留白的位置与具体曲目 ID。使用已有原始标签及 Agent 规则，列出引用和不确定处。`);
+          await copy(`请结合随附 BGM 图谱，为「${queryText||"我给你的分镜"}」挑选 BGM 和音效。注明适用镜头、进出点、降音量或留白的位置与具体曲目 ID。使用人工标签和备注（权重 1.0），参考 Agent 规则及剪映曲名（权重 0.35），仅按曲名的候选标为需试听，并列出引用和不确定处。`);
         }))),flash,query),viewport];
 }
 

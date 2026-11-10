@@ -1,6 +1,6 @@
 # 开发路线图
 
-现状：V3 界面的 Windows 桌面开发版 `0.1.5-dev` 已启用 Agent 排障、BGM 图谱和 Skill 商城  
+现状：V3 界面的 Windows 桌面开发版 `0.1.6-dev` 已启用 Agent 排障、BGM 图谱和 Skill 商城  
 负责人：捞鱼  
 最后更新：2026-11-10
 
@@ -28,6 +28,8 @@
 
 ## 实测
 
+- `0.1.6-dev` 使用本机剪映 11.6 组件读取 79 份有效草稿快照，得到 50 条曲名映射，旧打标库确认 10 条。桌面包已验证仅凭曲名进入 AI 候选和图谱，以及原库保持原样。
+
 - `0.1.5-dev` 绑定原 BGM 数据库，26 条音源已关联。桌面包使用数据库副本验证写回、备份及重启回读；接口回归验证冲突保护。
 
 - `0.1.4-dev` 读取本机旧 BGM 标签库。58 条标签自动恢复，22 条匹配本地音源。实测解码、重启与图谱同步，旧库字节一致。
@@ -36,5 +38,5 @@
 - Windows 桌面隔离项目通过 MP4 导入和解码、写入源时间批注、关闭时保存、退出时关闭内部服务、重开读回批注、打开时间线及 BGM 库。
 - 早期 Edge 原型隔离项目通过原片导入、Range 206、实际拖选区间、批注、候选粗剪、分割、拖动及两端修剪、锁定、撤销重做、Agent 合法及越界回传、采用、版本批注和重开验证。
 - 第二个 Edge 原型隔离项目通过曲库扫描、试听、加入项目素材、进入音频轨及合成剪映明文草稿导入。已核对源入点、音量、字幕和采用后的版本记录。
-- `node --test tests/legacy-bgm.test.mjs tests/agent-market.test.mjs tests/feedback.test.mjs tests/timeline.test.mjs` 通过 9 项检查，涵盖反馈、诊断、源与成片时间、锁定与选区、草稿基础字段和轨道校验。
+- `node --test tests/draft-titles.test.mjs tests/legacy-bgm.test.mjs tests/agent-market.test.mjs tests/feedback.test.mjs tests/timeline.test.mjs` 通过 11 项检查，涵盖反馈、诊断、源与成片时间、锁定与选区、草稿基础字段和轨道校验。
 - 已采用 [V3 莓紫撞色](配色评审.md)；[V1 九页布局](设计评审.md) 为功能组织参考。正式安装器、公开发行、Mac 启动和当前剪映实际往返另行验证。

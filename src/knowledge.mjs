@@ -20,9 +20,11 @@ export function libraryRows(input) {
       Array.isArray(values) ? values.slice(0, 24).map(value => ({ group: text(group, 60), label: text(value, 60) })) : [])
       .filter(tag => tag.group && tag.label);
     const note = text(row.note, 1200);
-    if (!tags.length && !note) continue;
+    const hint=row.titleHint?.source==="jianying-draft"?text(row.titleHint.value,120):"";
+    if (!tags.length && !note && !hint) continue;
     const id = hash(source).slice(0, 24);
-    tracks.set(id, { id, title, kind: row.kind, duration: Number.isFinite(row.duration) ? row.duration : null, tags, note });
+    tracks.set(id, { id, title:hint||title, kind: row.kind, duration: Number.isFinite(row.duration) ? row.duration : null, tags, note,
+      ...(hint?{titleHint:{value:hint,source:"jianying-draft",weight:0.35}}:{}) });
   }
   return [...tracks.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
