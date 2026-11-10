@@ -5,3 +5,4 @@ __pycache__/
 data/
 playwright-report/
 test-results/
+*.lnk
