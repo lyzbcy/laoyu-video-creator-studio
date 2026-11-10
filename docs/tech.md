@@ -11,7 +11,14 @@
 - Windows 开发制品放在 `%LOCALAPPDATA%/Programs/LaoyuCreatorStudio/<version>`，用 `python scripts/package_windows.py` 从本机缓存构建。需要 Python 3.11+、Pillow、`package.json` 指定的 Electron Windows x64 ZIP 和 electron-builder 缓存中的 `rcedit-x64.exe`。更新快捷方式目标和 `.cmd` 后从实际 EXE 核对标题栏版本。开发版未登记到软件中心，也未配置公开更新源。
 - 源码在本项目。运行数据在 `%LOCALAPPDATA%/LaoyuCreatorStudio`。剪辑项目分别保存 `board.json`、`editor.json` 和素材，两个文档独立修订，写入用同目录原子替换。
 - 素材按支持的扩展名流式落盘，记录大小与 SHA-256。旧画布导入或缺片重链需匹配原哈希。媒体端点支持字节 Range。某些旧编码需要用户提供兼容预览文件。
-- Electron 的偏好与浏览器存储分开，保存在运行数据目录的 `desktop-profile` 中。文件型剪辑项目沿用 `projects`。网页原型和旧 BGM 工具中仅保存在浏览器的标签可通过曲库导出、导入迁移。
+- Electron 的偏好与浏览器存储分开，保存在运行数据目录的 `desktop-profile` 中。文件型剪辑项目沿用 `projects`。旧 BGM 工具中仅保存在浏览器的标签可通过曲库导出、导入迁移。
+
+## 旧 BGM 标签库接入
+
+- 在本机运行目录配置 `legacy-bgm.json`。字段 `library` 为旧标签 JSONL 的绝对路径，`audioDirs` 为原音源目录的绝对路径数组。配置留在用户运行目录。主程序只读旧库，进入 BGM 打标时自动加载，已打开的页面沿用现有同步周期。
+- 同步保留创作台里的手动改动。未改动的记录跟随旧库更新。已手动绑定的数据库优先。旧库临时不可读时保留已经读入的标签。
+- 音源按确切文件名、完整源 ID 或唯一的旧导出短 ID 匹配。配置的音源目录只补入可匹配的音频。缺音源的条目保留备注，仍可同步到知识图谱。
+- 已在 Windows 实装同款包上核验真实旧库 58 条、22 条匹配音源、抽样解码、重启恢复和图谱同步。测试前后旧库字节一致。
 
 ## 时间线与 Agent
 

@@ -154,6 +154,7 @@
     background: var(--paper-2);
     border: 1px dashed var(--border-strong);
   }
+  #legacyDbStatus { font-size:12px; color:#4c6b3a; }
   #dbStatus.ok { color: #4c6b3a; background: var(--moss-soft); border-color: var(--moss); }
   #dbStatus.wait { color: #9c6a1f; background: #faf0d8; border-color: #d8b968; cursor: pointer; }
   #dbStatus.warn { color: #b04327; background: var(--tang-soft); border-color: var(--tang); }
@@ -682,6 +683,7 @@
   <button class="btn bouncy" id="btnSendToStudio">加入剪辑项目</button>
   <button class="btn bouncy" id="btnBind" title="打开并绑定 bgm_library.jsonl——打开已有文件直接连接，不会覆盖它">🔗 数据库</button>
   <span id="dbStatus">未绑定 — 数据只存浏览器本地</span>
+  <span id="legacyDbStatus" role="status" hidden></span>
   <span class="spacer"></span>
   <button class="btn bouncy" id="btnAiTag" title="根据备注文本自动补标签（增量，不覆盖已有标签）">✨ 备注打标</button>
   <button class="btn bouncy" id="btnRename" title="命名规则：有草稿原名的用「原名-标签_哈希」（放不下就「原名_哈希」），没有原名的用「标签_哈希」；后来才认出原名的会自动顶掉旧标签名">🏷️ 一键更新名称</button>
@@ -976,6 +978,7 @@
 
 <div id="toast"><img id="toastSticker" src="assets/stickers/happy.png" alt=""><span id="toastText"></span></div>
 
+<script src="/tagger/legacy-library.js"></script>
 <script>
 "use strict";
 
@@ -1024,6 +1027,7 @@ const NOTE_SYNONYMS = {
 const state = {
   groups: JSON.parse(JSON.stringify(DEFAULT_GROUPS)),
   tracks: {},        // id -> {id, file, kind, fmt, size, duration?, url?, _file?, decodeFail?}
+  legacyBaseline: {}, legacyGroups: {},
   records: {},       // id -> {id, file, kind, duration, tags, note?, labeled_at, updated_at}
   order: [],
   current: null,
@@ -1192,7 +1196,8 @@ function snapshot() {
     const t = state.tracks[id];
     tracks[id] = { id: t.id, file: t.file, displayName: t.displayName || null, kind: t.kind, kindSource: t.kindSource || null, waveChecked: t.waveChecked || false, decodeFail: t.decodeFail || false, fmt: t.fmt, size: t.size, duration: t.duration };
   }
-  return { groups: state.groups, tracks, records: state.records, order: state.order, current: state.current, blocklist: state.blocklist || [] };
+  return { groups: state.groups, tracks, records: state.records, order: state.order, current: state.current, blocklist: state.blocklist || [],
+    legacyBaseline:state.legacyBaseline,legacyGroups:state.legacyGroups };
 }
 
 function saveLocal() {
@@ -1211,6 +1216,8 @@ function loadLocal() {
     state.tracks = s.tracks;
     for (const id in state.tracks) if (!state.tracks[id].kind) state.tracks[id].kind = "music"; // v1 迁移
     state.records = s.records || {};
+    state.legacyBaseline = s.legacyBaseline || {};
+    state.legacyGroups = s.legacyGroups || {};
     state.order = s.order || Object.keys(state.tracks);
     state.current = s.current || null;
     state.blocklist = Array.isArray(s.blocklist) ? s.blocklist : [];
@@ -1825,7 +1832,7 @@ function renderList() {
       div.innerHTML = `<span class="status">🚫</span>` +
         `<span class="kindBadge ${r.kind || "music"}">${r.kind === "sfx" ? "音效" : r.kind === "ambient" ? "底噪" : "音乐"}</span>` +
         `<span class="name">${r.file || id}</span>` +
-        (preview ? `<span class="preview-tags">${preview}</span>` : "");
+        (preview ? `<span class="preview-tags">${escHtml(preview)}</span>` : "");
       const btn = document.createElement("button");
       btn.className = "btn small bouncy";
       btn.textContent = "🔄 恢复";
@@ -1864,7 +1871,7 @@ function renderList() {
       `<span class="name${m.title ? " titled" : ""}">${escHtml(m.title || t.displayName || t.file)}</span>` +
       (m.vip ? `<span class="vipTag" title="VIP 曲目（来自剪映草稿记录）">👑</span>` : "") +
       (m.author ? `<span class="authorTag">· ${escHtml(m.author)}</span>` : "") +
-      (preview ? `<span class="preview-tags">${preview}</span>` : "") +
+      (preview ? `<span class="preview-tags">${escHtml(preview)}</span>` : "") +
       (state.selectMode ? "" : `<span class="dur">${t.duration ? fmtTime(t.duration) : ""}</span><button class="rowDel" title="从工具里移除（文件不删，可反悔）">🗑</button>`);
     div.onclick = e => {
       if (state.selectMode) { toggleSelect(id); return; }
@@ -1982,7 +1989,7 @@ function renderTagPanel() {
     const head = document.createElement("div");
     head.className = "groupHead";
     const selectedCount = rec && rec.tags[g.name] ? rec.tags[g.name].length : 0;
-    head.innerHTML = `<span class="gdot"></span><span class="gname">${g.name}</span>` +
+    head.innerHTML = `<span class="gdot"></span><span class="gname">${escHtml(g.name)}</span>` +
       `<span class="gcount">${selectedCount ? `已选 ${selectedCount}` : ""}</span><span class="spacer"></span>`;
     const btnAdd = document.createElement("button");
     btnAdd.className = "btn small bouncy"; btnAdd.textContent = "＋ 标签";
@@ -1998,7 +2005,7 @@ function renderTagPanel() {
       const sp = document.createElement("span");
       const on = rec && rec.tags[g.name] && rec.tags[g.name].includes(tag);
       sp.className = "tag" + (on ? " on" : "");
-      sp.innerHTML = tag + (on ? `<span class="delTag" title="移除">✕</span>` : "");
+      sp.innerHTML = escHtml(tag) + (on ? `<span class="delTag" title="移除">✕</span>` : "");
       sp.onclick = e => {
         if (!cur) { toast("先选一首音频再打标哦", true, "proud.png"); return; }
         if (e.target.classList.contains("delTag")) toggleTag(g.name, tag, true);
@@ -2877,7 +2884,7 @@ function pickCacheDirs(dirs, defaultChecked) {
       cb.type = "checkbox"; cb.checked = !defaultChecked || defaultChecked.includes(d.dir);
       cb.style.marginTop = "6px";
       const span = document.createElement("span");
-      span.innerHTML = `<b>${d.count}</b> 首${d.user ? `${d.kind === "sfx" ? "🔊音效" : "🎵音乐"}` : "缓存"}音频${d.user ? ` <span style="color:var(--moss);font-size:11px">已记住</span>` : ""}<br><span style="color:var(--ink-faint);font-size:12px;word-break:break-all">${d.dir}</span>`;
+      span.innerHTML = `<b>${d.count}</b> 首${d.user ? `${d.kind === "sfx" ? "🔊音效" : "🎵音乐"}` : "缓存"}音频${d.user ? ` <span style="color:var(--moss);font-size:11px">已记住</span>` : ""}<br><span style="color:var(--ink-faint);font-size:12px;word-break:break-all">${escHtml(d.dir)}</span>`;
       label.append(cb, span);
       row.append(label);
       // 手动注册的常驻目录：给个「取消记住」入口（缓存目录是自动发现的，没有这个按钮）
@@ -2919,6 +2926,11 @@ async function syncFromServer(first, forceChoose = false) {
   try {
     const r = await fetch(base + "/manifest.json", { cache: "no-store" });
     const data = await r.json();
+    const legacy = state.handle ? null : data.legacy;
+    const legacyStatus = $("legacyDbStatus");
+    legacyStatus.hidden = !legacy;
+    if (legacy?.unavailable) legacyStatus.textContent = "旧标签库暂时无法读取 · 已保留本机标签";
+    const labelsChanged = legacy?.records ? mergeLegacyTags(state, legacy) : false;
     // 多缓存位置：自动同步 = 发现的全部有音频位置都同步（发现即同步，新目录自动进来，
     // 绝不因记忆失效卡死或漏目录）；只有用户主动点「一键同步」才弹选择框做过滤，
     // 选择结果只作为下次弹窗的预勾选。曾因 remembered 过滤把同步挂死/漏新目录，整库 💤。
@@ -2951,9 +2963,9 @@ async function syncFromServer(first, forceChoose = false) {
       // 共享文件夹里的导出包靠这个认祖归宗，B 电脑重启后不用再超级导入一遍。
       // 导出标准是哈希前 8 位（stdNameFor slice(0,8)），所以 8 位后缀也要认：
       // 在库里找以这 8 位开头的原哈希；命中多个（前缀碰撞）则放弃，当普通文件入库
-      let hid = null;
+      let hid = f.legacyId !== base2 ? f.legacyId : null;
       const hm = /_([0-9a-f]{8,32})$/.exec(base2);
-      if (hm) {
+      if (!hid && hm) {
         const suf = hm[1];
         if (suf.length === 32) hid = suf;
         else {
@@ -2969,12 +2981,15 @@ async function syncFromServer(first, forceChoose = false) {
         if (state.records[hid] && state.records[hid].excluded) continue;
         const ht = state.tracks[hid];
         if (ht) {
-          if (!ht._file && !ht.url) { ht.url = f.url || url; if (f.fmt) ht.fmt = f.fmt; rebinded++; }
+          if (!ht._file && !ht.url) {
+            ht.url = f.url || url; ht.fmt = f.fmt || ht.fmt; ht.size = f.size || ht.size;
+            ht.duration ||= f.duration; rebinded++;
+          }
           // 影子清理：标准名 track 本体没有实体、实体已挂回原哈希条目 → 影子删掉，
           // 不然它永远以 💤 的样子赖在列表里（36 首幽灵就是这么来的）。
           // 保守起见：影子自带独立打标记录的不动，留给「数据清理」合并。
           const st = state.tracks[base2];
-          if (st && st !== ht && base2 !== hid && !st._file && !st.url && !state.records[base2]) {
+          if (st && st !== ht && base2 !== hid && !st._file && (!st.url || st.url === url) && !state.records[base2]) {
             delete state.tracks[base2];
             pruned++;
           }
@@ -3005,7 +3020,14 @@ async function syncFromServer(first, forceChoose = false) {
       state.tracks[base2] = nt;
       added++;
     }
-    rebuildOrder(); saveLocal(); renderList(); renderProgress();
+    rebuildOrder(); saveLocal();
+    if (labelsChanged) renderAll();
+    else { renderList(); renderProgress(); }
+    if (legacy?.records) {
+      const labeled = legacy.records.filter(item=>!item.excluded && isLabeled(item.id));
+      const available = labeled.filter(item=>state.tracks[item.id]?.url || state.tracks[item.id]?._file).length;
+      legacyStatus.textContent = `旧标签库（只读） · ${labeled.length} 条已打标 · ${available} 条有音源`;
+    }
     if (first) {
       log("info", "服务器模式", `载入 ${added} 首` + (kindFixed ? `，按时长自动分类 ${kindFixed} 首` : "") + (rebinded ? `，认回导出包文件 ${rebinded} 首` : "") + (pruned ? `，清掉幽灵条目 ${pruned} 个` : ""));
       toast(`载入 ${added} 首${kindFixed ? `，自动分好 ${kindFixed} 首的类型` : ""}${rebinded ? `，认回 ${rebinded} 首导出包文件` : ""}${pruned ? `，清掉 ${pruned} 个幽灵条目` : ""}`, false, "wave.png");
@@ -3456,7 +3478,7 @@ if (restored) {
 renderAll();
 updateDbStatus();
 setInterval(saveLocal, 5000);
-tryRestoreHandle(); // 尝试自动恢复数据库连接
+const restoredHandle = tryRestoreHandle(); // 先恢复用户明确绑定的数据库
 
 $("btnSendToStudio").addEventListener("click", async () => {
   const track=state.tracks[state.current];
@@ -3471,7 +3493,7 @@ $("btnSendToStudio").addEventListener("click", async () => {
 });
 const serverParam = new URLSearchParams(location.search).get("server");
 if (serverParam) {
-  loadFromServer(serverParam);
+  restoredHandle.then(() => loadFromServer(serverParam));
   // 自适应更新：每 60 秒悄悄对一次清单，剪映缓存有新增就自动入库
   setInterval(() => syncFromServer(false), 60000);
 }

@@ -5,6 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const { readLegacyLibrary } = require("./legacy-source.js");
 
 const TOOL_DIR = __dirname;
 const DATA_DIR = process.env.LAOYU_STUDIO_DATA;
@@ -96,10 +97,24 @@ function discoverMusicDirs() {
   return found;
 }
 
+// Read the configured library through a bounded cache shared with audio requests.
+let legacy, legacyAt = 0;
+function legacyLibrary() {
+  if (Date.now() - legacyAt >= 10000) {
+    legacy = readLegacyLibrary(DATA_DIR);
+    legacyAt = Date.now();
+  }
+  return legacy;
+}
+function musicDirectories(name) {
+  const old = legacyLibrary();
+  return [...new Set(discoverMusicDirs().concat(userMusicDirs(), old?.match(name) ? old.dirs : []))];
+}
+
 // 安全解析 /music/<name>：拒绝路径穿越，返回真实存在的文件路径（跨已发现目录找）
 function resolveMusicPath(name) {
   if (!name || /[\\/]|\.\./.test(name)) return null;
-  for (const dir of discoverMusicDirs().concat(userMusicDirs())) {
+  for (const dir of musicDirectories(name)) {
     const p = path.join(dir, name);
     try { if (fs.statSync(p).isFile()) return p; } catch (e) {}
   }
@@ -247,7 +262,9 @@ function buildManifest() {
   const kindByDir = new Map(userDirs.map(u => [u.dir, u.kind || "music"]));
   // 素材包子目录名自带类型（自动发现/注册展开出来的 音乐/音效/环境底噪），视为导出时确认过的分类
   const PKG_KIND = { "音乐": "music", "音效": "sfx", "环境底噪": "ambient", "music": "music", "sfx": "sfx", "ambient": "ambient" };
-  const allDirs = dirs.concat(userMusicDirs()); // 用户目录排在缓存目录后面：同名时缓存侧（原哈希名）优先
+  const old = legacyLibrary();
+  const ordinary = new Set(dirs.concat(userMusicDirs()));
+  const allDirs = [...new Set([...ordinary, ...(old?.dirs || [])])];
   const seen = new Map(); // 主文件名（去扩展名）-> {name, fmt, size, url, dir}
   const counts = allDirs.map(() => 0);
   allDirs.forEach((dir, di) => {
@@ -257,11 +274,14 @@ function buildManifest() {
     for (const f of files) {
       const m = /\.(mp3|m4a|wav|ogg|flac)$/i.exec(f);
       if (!m) continue;
+      const legacyId = old?.match(f);
+      if (!ordinary.has(dir) && !legacyId) continue;
       const base = f.replace(/\.[^.]+$/, "");
       if (seen.has(base)) continue; // 两目录同名（副本即缓存拷贝）只留一份
       const p = path.join(dir, f);
       try {
         const st = fs.statSync(p);
+        if (!st.isFile()) continue;
         counts[di]++;
         const fmt = sniffFmt(p, m[1].toLowerCase());
         const pkgKind = PKG_KIND[path.basename(dir)]; // 素材包子目录（音乐/音效/环境底噪）名即类型
@@ -275,6 +295,7 @@ function buildManifest() {
         } : undefined;
         seen.set(base, {
           name: f,
+          legacyId,
           fmt,
           size: st.size,
           duration: readAudioDuration(p, fmt, st.size, st.mtimeMs), // 秒；供前端自动分类音乐/音效
@@ -294,6 +315,7 @@ function buildManifest() {
       kind: kindByDir.get(d) || undefined,
     })),
     files: [...seen.values()],
+    legacy: old?.summary,
   });
   manifestAt = Date.now();
   return manifestCache;
@@ -619,6 +641,8 @@ module.exports = function handleTagger(req, res, pathname) {
     let filePath = null;
     if (pathname === "/tagger/" || pathname === "/tagger/index.html") {
       filePath = path.join(TOOL_DIR, "index.html");
+    } else if (pathname === "/tagger/legacy-library.js") {
+      filePath = path.join(TOOL_DIR, "legacy-library.js");
     } else if (/^\/tagger\/assets\/stickers\/[a-z]+\.png$/.test(pathname)) {
       filePath = path.join(TOOL_DIR, pathname.slice("/tagger/".length));
     } else if (pathname === "/manifest.json") {
@@ -650,7 +674,7 @@ module.exports = function handleTagger(req, res, pathname) {
     // 404 保险：文件必须真实存在，且落在工具目录或某个音频目录（剪映缓存/用户注册目录）内
     // ——只认 TOOL_DIR 或路径含 "music" 会挡住用户注册的共享文件夹，必须按目录白名单判
     if (!filePath || !fs.existsSync(filePath) ||
-        !filePath.startsWith(TOOL_DIR) && !discoverMusicDirs().concat(userMusicDirs()).some(d => filePath.startsWith(d + path.sep) || filePath === d)) {
+        !filePath.startsWith(TOOL_DIR) && !musicDirectories(path.basename(filePath)).some(d => filePath.startsWith(d + path.sep) || filePath === d)) {
       res.writeHead(404); res.end("not found"); return;
     }
     const stat = fs.statSync(filePath);
