@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "entries": [
+    {
+      "id": "software-video-production",
+      "type": "skill",
+      "name": "软件视频制作",
+      "author": "捞鱼工作室",
+      "description": "软件演示、生活场景和知识讲解的选题、镜头、剪辑与交付工作流。",
+      "version": "v1.55.0",
+      "url": "https://github.com/lyzbcy/laoyu-miaomiao-tools/releases/download/v1.55.0/software-video-production.zip",
+      "sha256": "0da9fdc0e93593911b529a6880f22a20eaeb3f23edd012e7f1ea98c8a941d055"
+    },
+    {
+      "id": "lyzbcy-video-publish-assistant",
+      "type": "skill",
+      "name": "多平台视频发布",
+      "author": "捞鱼工作室",
+      "description": "在已有登录态中准备视频投稿、校对封面文案并按授权发布。",
+      "version": "v1.53.0",
+      "url": "https://github.com/lyzbcy/laoyu-miaomiao-tools/releases/download/v1.53.0/lyzbcy-video-publish-assistant.zip",
+      "sha256": "db9ce5d2469f9bcd441c658bb83c3d74052dffa9b65c1a5d75e91555877208b8"
+    },
+    {
+      "id": "lyzbcy-wechat-autopublish",
+      "type": "skill",
+      "name": "微信公众号自动发布",
+      "author": "捞鱼工作室",
+      "description": "公众号图文的排版、草稿、审核与发表工作流。",
+      "version": "v1.56.0",
+      "url": "https://github.com/lyzbcy/laoyu-miaomiao-tools/releases/download/v1.56.0/lyzbcy-wechat-autopublish.zip",
+      "sha256": "b3c9072101436438ed447eaa8ff6a46f5db4e6afe3faba026b8904fa1f5fc4e5"
+    },
+    {
+      "id": "laoyu-bgm-tags",
+      "type": "bgm",
+      "name": "捞鱼的 BGM 打标库",
+      "author": "捞鱼工作室",
+      "description": "58 条音乐、音效与环境音的标签和用法备注。提供知识图谱素材，音频需使用你有权使用的音源。",
+      "version": "2026.09",
+      "url": "https://raw.githubusercontent.com/lyzbcy/laoyu-video-studio-marketplace/main/assets/laoyu-bgm-tags-2026-09.jsonl",
+      "sha256": "9420091b022017baa61468976fe12a9f7add7ea10bc1f906c135dc8bc106ba4c"
+    }
+  ]
+}

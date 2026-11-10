@@ -1,0 +1,49 @@
+{
+  "generator": "built-in image_gen",
+  "palette": {
+    "workSurface": "#F6F3EE",
+    "card": "#FFFCF8",
+    "support": "#E8EFF8",
+    "chrome": "#E1E9F4",
+    "text": "#253347",
+    "textMuted": "#526074",
+    "divider": "#DADFE6",
+    "primary": "#355D91",
+    "primaryText": "#FFFFFF",
+    "accentDecorative": "#F1B39A",
+    "audioWaveform": "#477B77",
+    "captionTrack": "#EFEDF5",
+    "videoSurround": "#18232E"
+  },
+  "pages": [
+    {
+      "id": "01",
+      "name": "首页",
+      "prompt": "Use case: ui-mockup, targeted color and visual-finish revision of the supplied exact desktop app mockup, a single wide landscape screenshot. Product name must read exactly “捞鱼创作台”. Keep the layout, app architecture, panel boundaries, dimensions, proportions, text meaning, stickers, character positions, and control density of the source. Do not add controls or sections. New coherent palette: warm porcelain off-white canvas #F6F3EE, warm ivory cards #FFFCF8, very pale powder blue #E8EFF8 supporting surface, title strip and sidebar in medium-light blue gray #E1E9F4 (a custom app title bar with same small icon, name and Windows controls, never a blank white bar), slate-ink #253347 text with #526074 muted labels, #DADFE6 subtle hairline dividers. Action color is crisp muted denim blue #355D91 with white text, selected states are powder blue or blue outline, use a tiny restrained peach #F1B39A accent only for illustration details, never for all action buttons. No dark teal chrome, no yellow borders, no neon, no huge shadows, no thick borders. A tactile matte printed editorial aesthetic, professional working software with quiet chrome and strong affordances, calm and generous, no trendy gradients. Do not recolor or redraw the stickers themselves: keep original soft sculpted brown hair, eyes, clothing and expressions, full color. Preserve photo thumbnails. Preserve the exact screen aspect and cropping. Use crisp legible Simplified Chinese.\nEdit image 1, 首页: keep the sidebar and selected 首页; the two large equal cards “BGM 打标” and “AI 辅助剪辑” are the same layout. Left card very pale dusty blue, right card a cream-blush ivory mix. Main heading “开始创作”, lower “最近项目”, preserve the three project rows and three featured stickers. Use denim on the two clear “进入工作区” buttons. Correct the card sublabels to “整理音乐与音效” and “原片标注、AI 粗剪与人工微调”. The background is a full warm-porcelain work surface; maintain distinct visual hierarchy and ample whitespace. Avoid pure-white chrome, pure black text, or playful gold emphasis rays all over. The result must look like the exact previous screen with a more elegant light color palette.",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "5bff0d6f96e92585b6bd43a5b8da79d756ac04e5754708cce95d7d38e4520828",
+      "file": "01-首页.png",
+      "references": [
+        "../v1/01-首页.png"
+      ]
+    },
+    {
+      "id": "06",
+      "name": "剪辑时间线",
+      "prompt": "Use case: ui-mockup, targeted color and visual-finish revision of the supplied exact desktop app mockup, a single wide landscape screenshot. Product name must read exactly “捞鱼创作台”. Keep the layout, app architecture, panel boundaries, dimensions, proportions, text meaning, stickers, character positions, and control density of the source. Do not add controls or sections. New coherent palette: warm porcelain off-white canvas #F6F3EE, warm ivory cards #FFFCF8, very pale powder blue #E8EFF8 supporting surface, title strip and sidebar in medium-light blue gray #E1E9F4 (a custom app title bar with same small icon, name and Windows controls, never a blank white bar), slate-ink #253347 text with #526074 muted labels, #DADFE6 subtle hairline dividers. Action color is crisp muted denim blue #355D91 with white text, selected states are powder blue or blue outline, use a tiny restrained peach #F1B39A accent only for illustration details, never for all action buttons. No dark teal chrome, no yellow borders, no neon, no huge shadows, no thick borders. A tactile matte printed editorial aesthetic, professional working software with quiet chrome and strong affordances, calm and generous, no trendy gradients. Do not recolor or redraw the stickers themselves: keep original soft sculpted brown hair, eyes, clothing and expressions, full color. Preserve photo thumbnails. Preserve the exact screen aspect and cropping. Use crisp legible Simplified Chinese.\nEdit image 1, 剪辑时间线. Image 2 is the new palette on the homepage: match its actual light blue-gray title bar and sidebar, warm ivory surface, muted navy typography, fine borders and denim button exactly. Keep the image 1 production editor composition, same left source thumbnails, dark video preview area (letterbox can remain near black) with the same photo, same AI panel at upper right with both stickers, same bottom multitrack timeline with the same clips, tracks, lock and arrangement. The central video surround stays dark charcoal only where needed for the video. The timeline area itself is warm white with light neutral alternating lanes and very legible gray ticks, use slate blue for video clip labels and thin selection outlines, desaturated spruce #477B77 for waveform, very light lavender-gray #EFEDF5 for subtitles, and deep denim #355D91 for the playhead and active track. Lock badge subdued blue gray with a clearly visible dark lock icon, no dark yellow. Preserve the existing text and controls, especially “剪辑时间线”, “让 AI 接着改”, “保留人工改动”, “生成修改建议”, “画面”, “BGM”, “字幕”, and the reference playhead label “00:34.318”. The palette should make the controls and track distinction clear at a glance and feel like the same app as the reference homepage.",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "524dc7fdd7a6f52254ab8420a421ef88a84de10832c9f5fb55ab5510d0c63243",
+      "file": "06-剪辑时间线.png",
+      "references": [
+        "../v1/06-剪辑时间线.png",
+        "01-首页.png"
+      ]
+    }
+  ]
+}

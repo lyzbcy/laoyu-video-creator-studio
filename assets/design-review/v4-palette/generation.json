@@ -1,0 +1,47 @@
+{
+  "generator": "built-in image_gen",
+  "palette": {
+    "chromeLavender": "#F1E7FF",
+    "chromeCitron": "#FFE985",
+    "chromeGrapefruit": "#FFB8AE",
+    "sidebar": "#FAF7F2",
+    "surface": "#FFFCF8",
+    "text": "#342933",
+    "action": "#FFC0B6",
+    "actionText": "#622934",
+    "bgm": "#EFE5FB",
+    "captions": "#FCE7D6",
+    "videoSurround": "#F0ECE9"
+  },
+  "pages": [
+    {
+      "id": "01",
+      "name": "首页",
+      "prompt": "Use case: ui-mockup. Recolor the attached actual desktop app mockup. EXACT source screenshot dimensions and layout. Preserve all existing panels, margins, titles, navigational logic, labels, Windows title-bar controls, original app icon, thumbnails and reference sticker illustrations. The user rejected all dark large UI surfaces, the blue surround, and the solid-colored title bar. Create a fresh fashion-editorial high-key design, entirely light UI surfaces with a vivid sophisticated color clash. Background airy warm porcelain #FFFCF8, sidebar warm white linen #FAF7F2 (not yellow beige, no blue). Dark aubergine-gray #342933 is for readable text and line icons only. Custom title bar is a single shallow ~55px designer composition, not a solid color and not a dark bar: left milk-lavender #F1E7FF behind the logo and precise product text “捞鱼创作台”, a large asymmetric angular butter-citron field #FFE985 across the middle-right and a pink grapefruit shape #FFB8AE overlapping it toward the right, window controls in dark ink on a calm pale pink endcap. Think clean large overlapping geometric paper fields, asymmetrical but not noisy. Make the title bar lighter than the previous screenshot, no dark fill or dark gradient, no faux lighting or paper noise. A brief grapefruit-coral pop plus lavender and lemon is intentional and contemporary. Accent button pastel coral #FFC0B6 with deep warm berry label #622934, no white-on-low-contrast, thin subtle neutral dividers, soft natural images. Preserve the character stickers as their original high-fidelity art without extra white outlines or altered colors. Maintain a precise realistic Chinese desktop application screenshot; no new panels, no decoration over controls, no poster frame, no background surrounding the app.\nPage 01 HOME. Keep the two BGM 打标 and AI 辅助剪辑 cards in exact positions; BGM card light lilac (#F2E8FF) with violet waveform line, AI editing card soft butter yellow (#FFF1B6) with coral tiny playhead, both clear blush primary buttons “进入工作区”. Recent projects panel clean white warm surface. Selected left navigation “首页” uses a compact pale citron background, no fluorescent acid line. Preserve the prominent listening boy, waving girl and girl holding the orange editing prop at lower right with existing placements. Exact existing app copy on all labels. Make color collision clear while visually light; all large surfaces are light.",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "file": "01-首页.png",
+      "references": [
+        "../v3-palette/01-首页.png"
+      ],
+      "sha256": "0942109e8975df72b1669060fee08196a74da4ca34140f6c6b7ac8643f31b21b"
+    },
+    {
+      "id": "06",
+      "name": "剪辑时间线",
+      "prompt": "Use case: ui-mockup. Recolor the attached actual desktop app mockup. EXACT source screenshot dimensions and layout. Preserve all existing panels, margins, titles, navigational logic, labels, Windows title-bar controls, original app icon, thumbnails and reference sticker illustrations. The user rejected all dark large UI surfaces, the blue surround, and the solid-colored title bar. Create a fresh fashion-editorial high-key design, entirely light UI surfaces with a vivid sophisticated color clash. Background airy warm porcelain #FFFCF8, sidebar warm white linen #FAF7F2 (not yellow beige, no blue). Dark aubergine-gray #342933 is for readable text and line icons only. Custom title bar is a single shallow ~55px designer composition, not a solid color and not a dark bar: left milk-lavender #F1E7FF behind the logo and precise product text “捞鱼创作台”, a large asymmetric angular butter-citron field #FFE985 across the middle-right and a pink grapefruit shape #FFB8AE overlapping it toward the right, window controls in dark ink on a calm pale pink endcap. Think clean large overlapping geometric paper fields, asymmetrical but not noisy. Make the title bar lighter than the previous screenshot, no dark fill or dark gradient, no faux lighting or paper noise. A brief grapefruit-coral pop plus lavender and lemon is intentional and contemporary. Accent button pastel coral #FFC0B6 with deep warm berry label #622934, no white-on-low-contrast, thin subtle neutral dividers, soft natural images. Preserve the character stickers as their original high-fidelity art without extra white outlines or altered colors. Maintain a precise realistic Chinese desktop application screenshot; no new panels, no decoration over controls, no poster frame, no background surrounding the app.\nPage 06 剪辑时间线. Image 1 is the timeline layout. Image 2 is the approved-color-direction home reference, match its exact airy lavender / citron / pink grapefruit shallow top composition and its warm-white side rail. Preserve all editor panels, timeline rulers and tracks, both characters, existing placement, thumbnails and text. The panel around the video preview and controls is light warm gray #F0ECE9 with dark ink icons; retain the picture, remove the black letterbox blocks by rendering light warm-gray surrounds and keeping preview geometry. Change “生成修改建议” to a pink grapefruit filled button with dark warm berry text. Active tabs and “保留人工改动” lock badge use restrained pastel butter yellow. Multi-track area itself warm white, fine plum-gray ticks and generous contrast: coral playhead with a small dark reddish rim, audio clips pale lavender #EFE5FB with aubergine waveform, subtitle clips pale apricot #FCE7D6 with warm dark text, video track still thumbnails with coral outline on the selected clip. No big dark color patches in UI. Clear panel separation and same pastel-graphic design as homepage, more restrained saturation in the work area.",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "file": "06-剪辑时间线.png",
+      "references": [
+        "../v3-palette/06-剪辑时间线.png",
+        "01-首页.png"
+      ],
+      "sha256": "bef09a853ee74fb67403852026b58d56e93ad02363cacebcb5f233e027debab7"
+    }
+  ]
+}

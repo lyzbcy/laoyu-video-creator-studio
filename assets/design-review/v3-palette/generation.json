@@ -1,0 +1,48 @@
+{
+  "generator": "built-in image_gen",
+  "palette": {
+    "chromePlum": "#452138",
+    "chromeTomato": "#DF503C",
+    "selectedLime": "#D7E85B",
+    "sidebar": "#EEE7DD",
+    "surface": "#F8F4EC",
+    "card": "#FFFCF7",
+    "text": "#2E2530",
+    "tomatoButtonText": "#160E14",
+    "musicCard": "#F0E4EC",
+    "editingCard": "#EDF1C8",
+    "bgm": "#DAE4CD",
+    "caption": "#F1DFE5"
+  },
+  "pages": [
+    {
+      "id": "01",
+      "name": "首页",
+      "prompt": "Use case: ui-mockup. Color-design revision of the exact supplied desktop software screenshot; keep source crop, positions, component geometry, navigation, text content, icon, three original stickers (color and posture), and photos. Maintain the visual quality of a contemporary creative tool; no browser or device frame, no other screen. Full width custom title strip approx 57px tall. IMPORTANT: completely remove all blue and pale blue shell colors. Make the title strip a purposeful graphic composition with asymmetric modern diagonal-cut color fields: roughly two-thirds deep warm blackberry-plum (#452138) from the left, a large saturated tomato-vermilion (#DF503C) field toward the right with a small lime-paper (#D7E85B) geometric slash between them, and dark plum again behind the window controls at far right. These are large clean geometric fields, subtle paper texture only, no stock gradient, no empty white title bar. Keep white logotype “捞鱼创作台” and the existing app icon sharply readable on the solid dark zone at left; no big text across the graphic right. Around the main area, sidebar is warm mushroom linen (#EEE7DD) with charcoal text, no blue or violet cast. Main canvas warm cream (#F8F4EC), cards white-cream (#FFFCF7), typography ink (#2E2530), borders warm taupe gray. Strong well composed complementary clash, do not turn whole screen rainbow. Primary actions dark blackberry plum with white text; tomato highlights one or two landmarks; lime tinted selected chips use dark ink. Preserve a comfortable readable quiet workspace and photographic reference colors. Polished editorial graphic design, bold accent areas, modest rounding, no tiny decorative shapes behind text, no childlike excess. Chinese text exact and clear.\nRevise the HOME reference: keep exactly two equal function cards and recent-project area. Color left function card distinct softly lavender-rose (#F0E4EC) with a bold blackberry heading “BGM 打标” and waveform in plum. Color right card distinct soft pale acid-lime (#EDF1C8) with tomato mini timeline mark and heading “AI 辅助剪辑”. Distinguish these two color-coded cards immediately. Left primary “进入工作区” plum with white; right same action as tomato red with dark text, or plum with white if needed for legibility. Preserve all 3 selected stickers with their original plaid, hair and eye colors, and show cream around their silhouette. Recent projects list stays warm neutral. Keep minimalist frame and selected “首页” with an acid lime tab on mushroom sidebar. It must look purposefully color-blocked with both playful stickers and readable UI.",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "file": "01-首页.png",
+      "references": [
+        "../v2-palette/01-首页.png"
+      ],
+      "sha256": "afe0897d84aa76dc881d1dd04c9483502254d5bcbbfc568b5cd848dce7c74223"
+    },
+    {
+      "id": "06",
+      "name": "剪辑时间线",
+      "prompt": "Use case: ui-mockup. Color-design revision of the exact supplied desktop software screenshot; keep source crop, positions, component geometry, navigation, text content, icon, three original stickers (color and posture), and photos. Maintain the visual quality of a contemporary creative tool; no browser or device frame, no other screen. Full width custom title strip approx 57px tall. IMPORTANT: completely remove all blue and pale blue shell colors. Make the title strip a purposeful graphic composition with asymmetric modern diagonal-cut color fields: roughly two-thirds deep warm blackberry-plum (#452138) from the left, a large saturated tomato-vermilion (#DF503C) field toward the right with a small lime-paper (#D7E85B) geometric slash between them, and dark plum again behind the window controls at far right. These are large clean geometric fields, subtle paper texture only, no stock gradient, no empty white title bar. Keep white logotype “捞鱼创作台” and the existing app icon sharply readable on the solid dark zone at left; no big text across the graphic right. Around the main area, sidebar is warm mushroom linen (#EEE7DD) with charcoal text, no blue or violet cast. Main canvas warm cream (#F8F4EC), cards white-cream (#FFFCF7), typography ink (#2E2530), borders warm taupe gray. Strong well composed complementary clash, do not turn whole screen rainbow. Primary actions dark blackberry plum with white text; tomato highlights one or two landmarks; lime tinted selected chips use dark ink. Preserve a comfortable readable quiet workspace and photographic reference colors. Polished editorial graphic design, bold accent areas, modest rounding, no tiny decorative shapes behind text, no childlike excess. Chinese text exact and clear.\nEdit image 1, the 剪辑时间线. Image 2 is the exact V3 homepage visual reference: match the same rich blackberry-plum angled title bar, lime slash, large tomato block, left warm mushroom linen sidebar, warm cream workspace. Keep editor proportions and the existing source panel, preview (dark charcoal video surround), “让 AI 接着改” panel, edit toolbar, and full three-row timeline. Preserve all footage colors and both stickers. For editor color use muted warm neutral cards; use blackberry on “生成修改建议” button, tomato red on a single playhead and tiny active clip edge, lime on the “保留人工改动” lock chip and small active tab only. BGM clips soft sage #DAE4CD with dark forest waveform; caption clips soft blush #F1DFE5 with blackberry ink. Video track original thumbnails. Strong but restrained geometric contrast, clear strokes and readable dark ink. No blue application UI. Maintain literal Chinese labels “剪辑时间线”, “画面”, “BGM”, “字幕”, “草稿交换”. Preserve selected area and transport, 00:34.318. Title bar exact text 捞鱼创作台. Result is a realistic full single screenshot, no labels outside screenshot.",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "file": "06-剪辑时间线.png",
+      "references": [
+        "../v2-palette/06-剪辑时间线.png",
+        "01-首页.png"
+      ],
+      "sha256": "a03eafda26bc58dfc3b0a73aba5e2015207e3bdbf193a5547cc511db8f55fc64"
+    }
+  ]
+}

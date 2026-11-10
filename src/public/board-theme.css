@@ -1,0 +1,11 @@
+:root {--ink:#2e2530;--dim:#6c5c62;--line:#ded2c9;--paper:#fffcf7;--green:#452138;--accent:#df503c;color:var(--ink);background:#f8f4ec}
+.masthead {background:#fffaf5;min-height:59px;padding:8px 13px}
+.masthead h1 {font-size:18px}.brand-mark {display:none}
+.outline {background:#f3ebe3}.inspector {background:#fffaf7}
+.layout {grid-template-columns:155px minmax(0,1fr) 285px}
+#viewport {background:radial-gradient(circle,#cbbabe 1px,transparent 1.25px) 0 0 / 22px 22px,#f5ece3}
+.nav-shot[aria-current="true"],.zoom-bar button:hover {background:#edf1c8;border-color:#c7d288;color:#452138}
+.shot.selected {box-shadow:0 0 0 2px #9b577f66}
+.primary:hover {background:#632a4b}
+@media(max-width:950px){.layout {grid-template-columns:120px minmax(0,1fr) 235px}.masthead .brand {display:none}}
+@media(max-width:660px){.layout {grid-template-columns:minmax(0,1fr) 190px}.outline{display:none}.toolbar{flex-wrap:wrap}}

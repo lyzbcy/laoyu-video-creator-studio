@@ -1,0 +1,159 @@
+{
+  "generator": "built-in image_gen",
+  "pages": [
+    {
+      "page": "01",
+      "name": "首页",
+      "file": "01-首页.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "e66f4325be16e77bc4cfb6b145e666e73f9f2105f6faa1442b6c56b928d358bd",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nPAGE 01 — HOME. Sidebar 首页 selected. Main content starts with the heading “开始创作”, then two equally important large actionable workspace cards side by side, heading left with exact labels “BGM 打标” and “AI 辅助剪辑”, compact button “进入工作区” on each. Left card uses the attached listening male sticker (black glasses, black hoodie) toward right side beside a restrained horizontal waveform. Right card uses attached blue-plaid girl waving and a tiny stylized time-marker behind her. Warm accents, no excessive copy. Lower row title “最近项目”, display three medium-width recent-project rows with thumbnail and name, one is “两台电脑一双手”, and a small text entry “新建项目”. Use an additional modest blue-plaid happy sticker near the recent-project helper. Design feels like a polished creator tool with obvious entry points and decorative characters in the whitespace. No thumbnails depicting identifiable real people; use a generic dual-monitor desktop still.",
+      "references": [
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-挥手.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\星星布丁精选12-重绘-20-我在听.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-开心.png"
+      ]
+    },
+    {
+      "page": "02",
+      "name": "音乐与音效库",
+      "file": "02-音乐与音效库.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "db6008295e82e7eb8acd6a3f7c8e4d29c796f08731d8a9d342077d4721dca71b",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nReference #1 is approved-style HOME SCREEN for visual system only. Match its charcoal-teal shell, typography, widths, thin line, coral accents and consistent product identity, but use a different functional body as specified. Reference #2 is product icon, remaining images are selected stickers. Keep readable, no extra headline slogan, app UI not an ad.\nPAGE 02 — BGM 打标 / 音乐与音效库. BGM 打标 is the selected sidebar item. At the top of content put small same-level tabs “音乐 / 音效库” selected and “曲库工具”. Title “音乐与音效库”. Left main area: compact tab switch “音乐 / 音效”, a search input “搜索曲名或标签”, filters “轻快”, “紧张”, “已打标”, and a tidy table of 5 tracks with play buttons, title, category, duration and one or two tags. Highlight the track “轻快出发”. Right inspector “片段标签” with a large turquoise waveform player and clear draggable playhead at 00:24 / 02:38, then rows for “情绪”, “场景”, “备注”, and coral button “保存标签”. Keep a restrained bottom now-playing transport. Place the provided listening boy sticker in the waveform card's upper right whitespace and the smiling girl's tiny sticker as inline “打标完成” feedback. Important: reference stickers occupy modest space and never cover table, waveform, controls or text.",
+      "references": [
+        "01-首页.png",
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\星星布丁精选12-重绘-20-我在听.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-开心.png"
+      ]
+    },
+    {
+      "page": "03",
+      "name": "曲库工具",
+      "file": "03-曲库工具.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "29f801b545d9201d60d113423fc26ceb349556d51ff7c3a9d49c23c3496fc05f",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nReference #1 is approved-style HOME SCREEN for visual system only. Match its charcoal-teal shell, typography, widths, thin line, coral accents and consistent product identity, but use a different functional body as specified. Reference #2 is product icon, remaining images are selected stickers. Keep readable, no extra headline slogan, app UI not an ad.\nPAGE 03 — BGM 打标 / 曲库工具. BGM 打标 is selected. Same top sibling tabs “音乐 / 音效库” and “曲库工具” selected. Main title “曲库工具”. Build a practical vertically spaced tool center, three sections with equal visual priority. “剪映同步” card has local status “同步正常”, last scan placeholder, and button “立即扫描”; a small attached saluting sticker at its right edge. “导入与导出” has two clear buttons “导入 JSONL” and “导出 JSONL”, no upload cloud icon, plus a small happy sticker. “AI 选曲” shows a short input “描述想找的音乐” and a result placeholder “按标签匹配曲库” with button “复制选曲指令”; include the attached boy listening as a 80px helper. Curated stickers anchor UI feedback; keep all cards and buttons highly functional and aligned. No invented sync metrics or instructions paragraphs.",
+      "references": [
+        "01-首页.png",
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-敬礼.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-开心.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\星星布丁精选12-重绘-20-我在听.png"
+      ]
+    },
+    {
+      "page": "04",
+      "name": "剪辑项目列表",
+      "file": "04-剪辑项目列表.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "13bc4165c7ee049b124515c58969a5d0f0c7e66825c5dc9d3cda8a5dd5eae2a0",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nReference #1 is approved-style HOME SCREEN for visual system only. Match its charcoal-teal shell, typography, widths, thin line, coral accents and consistent product identity, but use a different functional body as specified. Reference #2 is product icon, remaining images are selected stickers. Keep readable, no extra headline slogan, app UI not an ad.\nPAGE 04 — AI 辅助剪辑 / 项目列表. Sidebar AI 辅助剪辑 selected, page title “剪辑项目”. An upper left set of actions with primary coral “新建项目”, quieter “导入旧画布” and “导入剪映草稿”. Under it, search “搜索项目” and three realistic project cards, big preview images: “两台电脑一双手” with anonymous two-computer desk, “办公桌改造” with keyboard and lamp, “周末随拍” with city greenery. Each card has short version/status text and button “继续编辑”. Lower left concise “最近打开” list; lower right helper module with the attached excited girl from 期待 and wave girl, placed around a small blank-state onboarding illustration “把素材拖进来”. Emphasize entry hierarchy and projects, keep one coherent desktop screen.",
+      "references": [
+        "01-首页.png",
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-期待.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-挥手.png"
+      ]
+    },
+    {
+      "page": "05",
+      "name": "素材画布",
+      "file": "05-素材画布.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "48d01e1599f5f4008e227ea4ed60756d52717d3f58d1789f902703359d6240f2",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nThe first reference is the established home screenshot, visual system only. Preserve exact window chrome, dark teal palette, icon, title, sidebar anatomy, coral selection; redesign functional body for this page. The following references are app icon and real selected stickers. Desktop editor must look usable and professional. Use no extra hero copy. Avoid any decorative illustration overlaying time scales, tracks, thumbnails, controls or user content.\nProject pages use the same project “两台电脑一双手” (generic two-monitor desk with sunset monitor wallpapers), breadcrumb “剪辑项目 / 两台电脑一双手”, and exactly three sibling tabs “素材画布”, “剪辑时间线”, “版本审阅”. Side navigation selects “AI 辅助剪辑”. Use compact project tabs, then the functional body.\nPAGE 05 — 素材画布 selected. The large central 55% zone must unmistakably be a spacious infinite canvas: muted dark teal fine dot grid, zoom “100%”, miniature minimap bottom left, several freely positioned movable cards separated by space and linked by subtle optional lines. Include one selected media card “IMG_7790.MOV” with two-monitor thumbnail and gold outline; another raw footage card “IMG_7789.MOV”; one coral script card “口播 / 两台电脑共用键鼠” and one note card “鼠标跨屏”. Main top button “导入原片”. Right source inspector: preview from the selected two-monitor clip, a player with position 00:07.083, and visible note rows “关键点” and “批注”, button “添加标记”. Across the bottom of central content draw clearly distinct “原片时间轴” with a continuous thumbnail strip for a SINGLE source video, a playhead at 00:07.083, yellow point and coral selected range with two draggable handles, controls “时间点”, “时间段”, “拖入分镜”. Do not draw an editing multi-track timeline here. Add two small reference stickers as cute illustrated note/avatar around the right inspector and on a canvas helper corner, with enough whitespace.",
+      "references": [
+        "01-首页.png",
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-期待.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-敬礼.png"
+      ]
+    },
+    {
+      "page": "06",
+      "name": "剪辑时间线",
+      "file": "06-剪辑时间线.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "91ad96b48b222d3605a7c7a56c0d1078c40365c54ea05ef2336c36e9ca91437b",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nThe first reference is the established home screenshot, visual system only. Preserve exact window chrome, dark teal palette, icon, title, sidebar anatomy, coral selection; redesign functional body for this page. The following references are app icon and real selected stickers. Desktop editor must look usable and professional. Use no extra hero copy. Avoid any decorative illustration overlaying time scales, tracks, thumbnails, controls or user content.\nProject pages use the same project “两台电脑一双手” (generic two-monitor desk with sunset monitor wallpapers), breadcrumb “剪辑项目 / 两台电脑一双手”, and exactly three sibling tabs “素材画布”, “剪辑时间线”, “版本审阅”. Side navigation selects “AI 辅助剪辑”. Use compact project tabs, then the functional body.\nPAGE 06 — 剪辑时间线 selected. Precisely structure this as a serious desktop editor. Upper-left main area “素材” with three modest source thumbnails and a small cutout listening sticker tucked in its footer; upper-middle video preview, 16:9 two-monitor desk, under it transport with 00:34.318 time; upper-right vertical panel titled “让 AI 接着改” containing precise range “00:30–00:38”, lock chip “保留人工改动”, short instruction “只缩短中段空档”, prominent coral action “生成修改建议”, a small attached fist-up focused sticker in upper corner. Toolbar immediately above timeline with compact clear actions “分割”, “修剪”, “撤销”, “草稿交换”. Bottom 42% professionally designed multi-track timeline on a timeline ruler (00:00, 00:10, 00:20, 00:30, 00:40) with three distinct rows “画面”, “BGM”, “字幕”, variable duration blocks with visible dark gaps and readable waveform, one segment selected in gold, one with lock icon. Playhead thin gold. Inspector useful, no logo-sticker crowding.",
+      "references": [
+        "01-首页.png",
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\星星布丁精选12-重绘-20-我在听.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-加油.png"
+      ]
+    },
+    {
+      "page": "07",
+      "name": "版本审阅",
+      "file": "07-版本审阅.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "0cdb06b4b55057a7d90ee2372bbba786f920431a4ae22206cddcba5390ce11e6",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nThe first reference is the established home screenshot, visual system only. Preserve exact window chrome, dark teal palette, icon, title, sidebar anatomy, coral selection; redesign functional body for this page. The following references are app icon and real selected stickers. Desktop editor must look usable and professional. Use no extra hero copy. Avoid any decorative illustration overlaying time scales, tracks, thumbnails, controls or user content.\nProject pages use the same project “两台电脑一双手” (generic two-monitor desk with sunset monitor wallpapers), breadcrumb “剪辑项目 / 两台电脑一双手”, and exactly three sibling tabs “素材画布”, “剪辑时间线”, “版本审阅”. Side navigation selects “AI 辅助剪辑”. Use compact project tabs, then the functional body.\nPAGE 07 — 版本审阅 selected. Show a functional version comparison workspace: left list within body with three numbered rows “v1 AI 粗剪”, “v2 人工微调” (adopted mint chip), “v3 AI 候选” (current gold selection). Center two side-by-side synchronizable video previews labeled “当前 v2” and “候选 v3”, both the same two-monitor demo with slightly different frames, shared play controls below at 00:34.318. Lower center list “改动对照” with two compact items “删去等待 1.2 秒” and “保留人工字幕”; per-item checkboxes and a coral “采用所选改动”. Right side “批注” showing two timecoded comments and a small edit field “写下批注”. Integrate a small happy reference sticker next to adopted status and a small saluting sticker by the change-confirmation area, clear room for text. No timeline editing controls.",
+      "references": [
+        "01-首页.png",
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-开心.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-敬礼.png"
+      ]
+    },
+    {
+      "page": "08",
+      "name": "剪映草稿交换",
+      "file": "08-剪映草稿交换.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "4a56336a04159e73a986737a8696f3e82fc50132b4f9e185c441c3129420c76d",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nReference #1 is the established app screenshot for exact visual continuity. Reference #2 is the icon. Remaining references are original selected stickers.\nPAGE 08 — 剪辑时间线上打开“草稿交换”侧抽屉. Reference #1 is the exact existing timeline design; preserve underlying editor and title/nav, dim its body slightly and open a wide right-side drawer (around 47% window width). This is the clear focus. Drawer title “剪映草稿交换”, close X. Under title a gold-neutral compact status label “剪映 11.6 · 待验证”. Two separate practical sections “导出到剪映” and “从剪映导入”; export shows three chips “画面” “音频” “字幕” and “导出为剪映草稿” button visibly grey/disabled in this verification state. Import shows button “选择草稿目录”, explanatory short label “导入为候选版本”. At bottom, compact help row “Agent 交接” with coral “复制 Agent 指令” and secondary “导出时间线包”. Attached saluting girl and expecting girl as cutout stickers in drawer title and bottom side, respectively, outside action/label areas. No operational claims like 已兼容、成功. Exactly one open drawer shown.",
+      "references": [
+        "06-剪辑时间线.png",
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-敬礼.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-期待.png"
+      ]
+    },
+    {
+      "page": "09",
+      "name": "设置",
+      "file": "09-设置.png",
+      "resolution": [
+        1487,
+        1058
+      ],
+      "sha256": "78f76b12672de0701d2d297027e8a31850ae908ce16436075882257f4040242b",
+      "prompt": "Use case: ui-mockup. Create one production-quality Chinese desktop application design review image, wide landscape, flat straight-on screenshot, full window edge-to-edge, no device mockup or browser, no white system title bar. Product exact title “捞鱼创作台”. Consistent brand: charcoal midnight teal app chrome (#101f24), subtly lighter teal-black cards (#162a30), thin muted teal separators, ivory Chinese text, soft muted mint secondary text, small restrained coral (#ff775e) for the primary action, complementary gold for selections and turquoise for audio. Crisp Chinese sans-serif, 8px spacing system, realistic 1440 desktop layout, useful legible button labels, square-ish 8–12px rounding, no neon gradients, no tiny fake Chinese paragraphs, no browser URLs. Exactly one page, no collage, no color swatch or presentation board. Top 42px thin custom title bar with the provided app logo as the small 24px product icon, product name at left and simple Windows controls at right. Below it a 168px permanent left sidebar with exactly “首页”, “BGM 打标”, “AI 辅助剪辑” and “设置” at the bottom, selected state as a muted teal block and small coral bar. Selected stickers from attached references are real localized product illustrations, not new mascot designs: preserve reference identities, hairstyles, glasses or silver star earrings, blue plaid, silhouettes and friendly soft 3D rendering. Use them as transparent-cutout illustrations only.\nReference #1 is the established app screenshot for exact visual continuity. Reference #2 is the icon. Remaining references are original selected stickers.\nPAGE 09 — 全局设置. Same title bar and permanent sidebar; select “设置” at bottom. Main title “设置”. A simple two-column settings workspace; main column contains compact field rows grouped under “本地工作区” with “剪辑项目目录”, “BGM 曲库目录”, their neutral path placeholders and “更改目录” buttons; a second section “剪映草稿位置” with a path field and “选择目录” button plus “兼容性待验证” neutral amber chip. Lower section “诊断” with “打开日志” button. Right narrow column uses two modest original attached stickers with identity intact, “工作区” small context header, neutral empty whitespace; cute functional visual without clutter. No live account info, key, cloud, notifications or invented version/locale switches, keep labels readable and no private paths.",
+      "references": [
+        "01-首页.png",
+        "E:\\共享\\创业\\01-捞鱼软件产品\\捞鱼打标工具\\assets\\creator-icon-candidate.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第35弹-画好啦.png",
+        "E:\\共享\\星星布丁\\微信表情包\\精选表情\\第12弹-敬礼.png"
+      ]
+    }
+  ]
+}

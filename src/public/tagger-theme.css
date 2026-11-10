@@ -1,0 +1,6 @@
+:root {--bg:#f8f4ec;--paper:#fffcf7;--paper-2:#f3ebe3;--border:#ded2c9;--border-strong:#c9b9bd;--ink:#2e2530;--ink-soft:#66545f;--ink-faint:#76666e;--tang:#a13b54;--tang-deep:#452138;--tang-soft:#f0e4ec;--moss:#718837;--moss-soft:#edf1c8;--berry:#7d496b;--berry-soft:#f0e4ec;--shadow:0 2px 7px #40233814;--radius:11px}
+body {background:var(--bg);background-image:none}
+header {background:var(--paper);padding:9px 10px}
+#btnFeedback,#updateBanner {display:none!important}
+body[data-mode="tools"] main,body[data-mode="tools"] #bottom {display:none}
+body[data-mode="tools"] header {align-items:center;min-height:130px;padding:15px}

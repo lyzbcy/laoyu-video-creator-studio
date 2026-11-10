@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>素材画布 · 捞鱼视频创作台</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23172923'/%3E%3Cpath d='M6 8h13v10H6zm7 10v5m-4 0h8m5-10h4v11H20v-3' fill='none' stroke='%23e0ebd5' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/board.css">
+  <link rel="stylesheet" href="/board-theme.css">
+  <script src="/board.js" defer></script>
+  <script src="/source-board.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 32 32"><rect x="4" y="7" width="15" height="12" rx="2"/><path d="M11.5 19v5m-4 0h8m7-11h4a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-7a2 2 0 0 1-2-2v-1"/></svg></span>
+      <div><div class="kicker">AI 辅助剪辑 <span>／</span> 素材画布</div><h1 id="board-title">素材画布</h1></div>
+    </div>
+    <div class="toolbar">
+      <span id="save-state" class="save-state" role="status">正在读取</span>
+      <button id="retry" type="button" hidden>重试保存</button>
+      <button id="add-shot" type="button" class="secondary">＋ 分镜</button>
+      <button id="upload-source" type="button" class="primary">＋ 导入原片</button>
+      <button id="library" type="button" class="secondary">素材库 <span id="asset-count">0</span></button>
+      <button id="export" type="button" class="secondary">↓ 导出剪辑单</button>
+    </div>
+  </header>
+  <main class="layout">
+    <aside class="outline" aria-label="分镜顺序">
+      <div class="outline-heading">
+        <div class="section-label">CUT ORDER</div>
+        <h2>分镜顺序</h2>
+        <div id="progress-label">正在加载分镜</div>
+        <progress id="progress" value="0" max="1"></progress>
+      </div>
+      <nav id="outline-list"></nav>
+      <footer>按镜头编号剪辑<br>画布位置可自由调整</footer>
+    </aside>
+    <div class="workspace">
+    <section id="viewport" aria-label="无边界分镜画布" tabindex="0">
+      <div id="world"></div>
+      <div class="canvas-label"><i></i> 分镜画布 <span>／</span> 原片可直接拖到空白处</div>
+      <div class="canvas-bottom">
+        <div class="zoom-bar" aria-label="画布缩放">
+          <button id="zoom-out" type="button" aria-label="缩小">−</button>
+          <button id="zoom-reset" type="button" title="恢复 100%"><span id="zoom-label">100%</span></button>
+          <button id="zoom-in" type="button" aria-label="放大">+</button>
+          <button id="fit" type="button" title="显示全部分镜">总览</button>
+        </div>
+        <span class="canvas-help">拖空白平移 · 滚轮缩放 · 拖标题移动卡片</span>
+      </div>
+    </section>
+    <section id="source-dock" aria-label="原素材时间轴" hidden></section>
+    </div>
+    <aside id="inspector" class="inspector" aria-label="选中镜头"></aside>
+  </main>
+  <div id="notice" role="status" hidden></div>
+  <input id="files" type="file" multiple accept="video/*,audio/*,image/*,.mkv,.avi,.mov,.m4v,.aac" hidden>
+  <dialog id="library-dialog">
+    <div class="dialog-heading">
+      <div><div class="section-label">SOURCE BIN</div><h2>素材库</h2></div>
+      <form method="dialog"><button aria-label="关闭素材库">×</button></form>
+    </div>
+    <p id="library-hint"></p>
+    <div id="library-list"></div>
+  </dialog>
+</body>
+</html>
