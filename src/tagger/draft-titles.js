@@ -6,7 +6,7 @@ const {execFile} = require("node:child_process");
 const {promisify} = require("node:util");
 const run = promisify(execFile);
 const idPattern = /^[a-f0-9]{32}$/i;
-const candidate = /^(?:draft_content\.json|draft_info\.json|template\.json(?:\.bak)?)$/i;
+const candidate = /^(?:draft_content\.json|draft_info\.json|key_value\.json|template\.json(?:\.bak)?)$/i;
 
 function titleLookup(fallback, snapshot) {
   const index=new Map();
@@ -18,7 +18,7 @@ function titleLookup(fallback, snapshot) {
     }
   }
   for (const [id,title] of Object.entries(snapshot?.titles||{})) {
-    if (idPattern.test(id) && typeof title==="string" && title) index.set(id,{...index.get(id),title,titleSource:"jianying-draft"});
+    if (idPattern.test(id) && typeof title==="string" && title) index.set(id,{...index.get(id),title,titleSource:snapshot.titleSources?.[id]==="jianying-catalog"?"jianying-catalog":"jianying-draft"});
   }
   for (const id of snapshot?.conflicts||[]) index.delete(id);
   return {find(...names) {
@@ -47,6 +47,27 @@ async function filesFor(roots) {
   return found.sort((a,b)=>b.mtime-a.mtime||a.full.localeCompare(b.full)).slice(0,300);
 }
 
+async function cacheInputs(userData) {
+  const cache=path.join(userData,"Cache");
+  const index=path.join(cache,"music","downLoadcfg");
+  const catalogRoot=path.join(cache,"ressdk_db");
+  const entries=await fs.readdir(catalogRoot,{withFileTypes:true}).catch(()=>[]);
+  const catalogs=[];
+  const stamps=[];
+  async function stat(file) {
+    const entry=await fs.stat(file).catch(()=>null);
+    if (!entry?.isFile()) return false;
+    stamps.push([file,entry.size,entry.mtimeMs]);
+    return true;
+  }
+  const cacheIndex=await stat(index)?index:null;
+  if (cacheIndex) for (const dir of entries.filter(entry=>entry.isDirectory()).sort((a,b)=>a.name.localeCompare(b.name)).slice(0,20)) {
+    const file=path.join(catalogRoot,dir.name,"rp.db");
+    if (await stat(file)) {catalogs.push(file);await stat(file+"-wal");}
+  }
+  return {cacheIndex,catalogs,stamps};
+}
+
 function createDraftTitles(data,onChange) {
   const file=path.join(data,"bgm-title-index.json");
   let current=null, initialized=false, running=null, autoAt=0;
@@ -64,20 +85,30 @@ function createDraftTitles(data,onChange) {
     if (process.platform!=="win32" || process.env.LAOYU_STUDIO_DISABLE_DISCOVERY==="1") return {configured:false};
     const config=await fs.readFile(path.join(data,"draft-titles.json"),"utf8").then(value=>JSON.parse(value.replace(/^\uFEFF/,"")),()=>null);
     if (!config || ![config.python,config.install].every(p=>typeof p==="string"&&path.isAbsolute(p)) || !/^[a-f0-9]{64}$/.test(config.dllSha256||"")) return {configured:false};
-    const defaultRoot=path.join(process.env.LOCALAPPDATA||"","JianyingPro","User Data","Projects");
+    const userData=path.join(process.env.LOCALAPPDATA||"","JianyingPro","User Data");
+    const defaultRoot=path.join(userData,"Projects");
     const files=await filesFor([defaultRoot,...(Array.isArray(config.roots)?config.roots:[])]);
-    const fingerprint=createHash("sha256").update(JSON.stringify([config.dllSha256,files])).digest("hex");
+    const {cacheIndex,catalogs,stamps}=await cacheInputs(userData);
+    const fingerprint=createHash("sha256").update(JSON.stringify([config.dllSha256,files,stamps])).digest("hex");
     if (current?.fingerprint===fingerprint) return {configured:true,drafts:current.draftsRead,titles:Object.keys(current.titles).length};
-    if (!files.length) return {configured:true,drafts:0,titles:0};
+    if (!files.length && !cacheIndex) return {configured:true,drafts:0,titles:0};
     const temp=await fs.mkdtemp(path.join(os.tmpdir(),"laoyu-bgm-titles-"));
     const request=path.join(temp,"request.json"), output=path.join(temp,"index.json");
     try {
-      await fs.writeFile(request,JSON.stringify({install:config.install,dllSha256:config.dllSha256,files:files.map(file=>file.full)}));
+      await fs.writeFile(request,JSON.stringify({install:config.install,dllSha256:config.dllSha256,files:files.map(file=>file.full),cacheIndex,catalogs}));
       await run(config.python,["-I","-B",path.join(__dirname,"read-draft-titles.py"),request,output],
         {cwd:temp,windowsHide:true,timeout:60000,maxBuffer:512*1024});
       const index=JSON.parse(await fs.readFile(output,"utf8"));
-      if (!index.draftsRead) throw new Error("No supported drafts");
-      const updated={schema:1,fingerprint,...index};
+      if (!index.draftsRead && !Object.keys(index.titles).length) throw new Error("No supported title sources");
+      const titles={...current?.titles}, titleSources={...current?.titleSources};
+      for (const [id,title] of Object.entries(index.titles)) {
+        if (index.titleSources?.[id]==="jianying-catalog") titleSources[id]="jianying-catalog";
+        else if (titleSources[id]==="jianying-catalog") continue;
+        titles[id]=title;
+      }
+      const conflicts=index.conflicts.filter(id=>titleSources[id]!=="jianying-catalog");
+      for (const id of conflicts) delete titles[id];
+      const updated={schema:1,fingerprint,draftsRead:index.draftsRead,titles,titleSources,conflicts};
       const pending=file+"."+randomBytes(8).toString("hex")+".tmp";
       try {await fs.writeFile(pending,JSON.stringify(updated),{flag:"wx"});await fs.rename(pending,file);}
       finally {await fs.unlink(pending).catch(()=>{});}

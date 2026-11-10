@@ -23,3 +23,14 @@ test("known names bring untagged tracks into search without becoming manual evid
   assert.equal(graph.tags.length,0);
   assert.throws(()=>validateInsights({schema:1,revision:graph.revision,insights:[{scene:"示例",kind:"适合",reason:"示例",evidence:[{track:tracks[0].id,quote:"进行曲"}]}]},graph),/找不到/);
 });
+
+test("catalog names stay weak and changing playback availability preserves curation revision",()=>{
+  const lookup=titles.titleLookup({}, {titles:{[raw]:"曲库标题"},titleSources:{[raw]:"jianying-catalog"}});
+  assert.equal(lookup.find(raw).titleSource,"jianying-catalog");
+  const row={id:raw,file:raw+".mp3",kind:"music",titleHint:{source:"jianying-catalog",value:"曲库标题",weight:9}};
+  const a=sourceGraph({tagger:libraryRows([{...row,available:true}])});
+  const b=sourceGraph({tagger:libraryRows([{...row,available:false}])});
+  assert.equal(a.tracks[0].titleHint.weight,0.35);
+  assert.equal(b.tracks[0].available,false);
+  assert.equal(a.revision,b.revision);
+});

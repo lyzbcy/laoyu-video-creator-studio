@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { createHash, randomBytes } from "node:crypto";
 import { libraryRows } from "./knowledge.mjs";
 
@@ -48,7 +49,31 @@ async function getBytes(url, maximum, fetcher) {
   throw fail("资源地址跳转次数过多。", 502);
 }
 
-export function createMarketplace(data, official, { fetcher = fetch } = {}) {
+function defaultSkillRoots() {
+  const home=os.homedir();
+  return [...new Set([process.env.CODEX_HOME, path.join(home,".codex"),path.join(home,".agents")]
+    .filter(value=>value&&path.isAbsolute(value)).map(value=>path.join(value,"skills")))];
+}
+
+async function findLocalSkill(id,roots) {
+  for (const root of roots) {
+    const file=path.join(root,id,"SKILL.md");
+    let handle;
+    try {
+      handle=await fs.open(file,"r");
+      if (!(await handle.stat()).isFile()) continue;
+      const bytes=Buffer.alloc(4096);
+      const {bytesRead}=await handle.read(bytes,0,bytes.length,0);
+      const frontmatter=/^\uFEFF?---\s*\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(bytes.subarray(0,bytesRead).toString("utf8"));
+      const name=frontmatter?.[1].match(/^name:\s*["']?([a-z0-9-]+)["']?\s*$/m)?.[1];
+      if (name===id) return {path:file};
+    } catch { /* This skill is absent or unreadable in this root. */ }
+    finally {if(handle)await handle.close().catch(()=>{});}
+  }
+  return null;
+}
+
+export function createMarketplace(data, official, { fetcher = fetch, skillRoots = defaultSkillRoots() } = {}) {
   const root = path.join(data, "market-downloads");
   let remote = new Map();
   const builtIn = new Map(official.map(validateEntry).map(entry => [entry.id, entry]));
@@ -91,7 +116,8 @@ export function createMarketplace(data, official, { fetcher = fetch } = {}) {
         } catch { /* Catalog remains usable offline. */ }
       }
       const items = await Promise.all([...entries().values()].map(async entry => ({ ...entry,
-        downloaded: await fs.stat(location(entry)).then(stat => stat.isFile(), () => false) })));
+        downloaded: await fs.stat(location(entry)).then(stat => stat.isFile(), () => false),
+        ...(entry.type==="skill"&&builtIn.get(entry.id)?.type==="skill"?{localSkill:await findLocalSkill(entry.id,skillRoots)}:{}) })));
       return { items, warning, repository };
     },
     async download(id) {

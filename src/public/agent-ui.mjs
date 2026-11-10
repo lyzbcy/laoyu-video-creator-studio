@@ -100,7 +100,7 @@ export function graphPage(initial) {
     const rules=graph.insights.filter(rule=>matches([rule.scene,rule.kind,rule.reason,rule.cue].join(" ")) &&
       (!tag || rule.evidence.some(item=>tag.tracks.includes(item.track))));
     viewport.replaceChildren(
-      e("section",{cls:"card"},e("h2",{},"原始打标"),e("p",{cls:"muted"},`${graph.tracks.length} 条曲目 · ${graph.tags.length} 个标签`),
+      e("section",{cls:"card"},e("h2",{},"原始打标"),e("p",{cls:"muted"},`${graph.tracks.length} 条曲目 · ${graph.tags.length} 个标签${graph.tracks.some(item=>item.available!==undefined)?` · ${graph.tracks.filter(item=>item.available===true).length} 条已关联音源`:""}`),
         e("div",{cls:"row graph-tags"},btn("全部",()=>{focus="";redraw();},"",{"aria-pressed":String(!focus)}),
           ...tags.map(tag=>btn(tag.key+" · "+tag.tracks.length,()=>{focus=tag.key;redraw();},"",{"aria-pressed":String(focus===tag.key)}))),
         graph.tracks.length?graphSvg(tag?.key||"BGM 标签",tag?clips.map(track=>track.title):tags.map(item=>item.key)):e("p",{cls:"muted"},"先同步打标记录、导入 JSONL，或在商城下载曲库并加入图谱。")),
@@ -111,7 +111,7 @@ export function graphPage(initial) {
           rule.cue?e("p",{cls:"muted"},"入点／剪辑提示　"+rule.cue):null,
           e("ul",{},...rule.evidence.map(item=>e("li",{},lookup.get(item.track)?.title+" · 「"+item.quote+"」")))))),
       e("section",{cls:"card"},e("h2",{},"关联曲目"),
-        ...clips.slice(0,24).map(track=>e("details",{cls:"evidence-row"},e("summary",{},track.title),
+        ...clips.slice(0,24).map(track=>e("details",{cls:"evidence-row"},e("summary",{},track.title+(track.available===false?" · 音源缺失":"")),
           e("p",{cls:"muted"},[track.kind,...track.tags.map(tag=>tag.label)].join(" · ")),track.note?e("p",{},track.note):null,
           track.titleHint?e("p",{cls:"muted"},`剪映曲名线索 (${track.titleHint.weight}) · ${track.titleHint.value}`):null)),
         clips.length>24?e("p",{cls:"muted"},"已显示前 24 条，可继续按标签或搜索缩小范围。"):null));
@@ -142,7 +142,7 @@ export function graphPage(initial) {
           const queryText=query.value.trim();
           const pack={schema:1,revision:graph.revision,tags:graph.tags,insights:graph.insights,tracks:graph.tracks};
           saveJson("BGM-选曲图谱.json",pack);
-          await copy(`请结合随附 BGM 图谱，为「${queryText||"我给你的分镜"}」挑选 BGM 和音效。注明适用镜头、进出点、降音量或留白的位置与具体曲目 ID。使用人工标签和备注（权重 1.0），参考 Agent 规则及剪映曲名（权重 0.35），仅按曲名的候选标为需试听，并列出引用和不确定处。`);
+          await copy(`请结合随附 BGM 图谱，为「${queryText||"我给你的分镜"}」挑选 BGM 和音效。注明适用镜头、进出点、降音量或留白的位置与具体曲目 ID。使用人工标签和备注（权重 1.0），参考 Agent 规则及剪映曲名（权重 0.35），仅按曲名的候选标为需试听。实际剪辑候选跳过 available=false 的条目，并列出引用和不确定处。`);
         }))),flash,query),viewport];
 }
 
@@ -193,7 +193,7 @@ export function marketPage(initial) {
   const items=e("div",{cls:"market-grid"});
   const feedback=status();
   const redraw=()=>items.replaceChildren(...catalog.items.filter(item=>filter==="all" || item.type===filter).map(item=>{
-    const get=btn(item.downloaded?"重新下载":"免费下载",run(async()=>{
+    const get=item.localSkill?null:btn(item.downloaded?"重新下载":"免费下载",run(async()=>{
       get.disabled=true;
       feedback.textContent="正在下载并校验「"+item.name+"」…";
       try {
@@ -204,18 +204,19 @@ export function marketPage(initial) {
       } catch(error) {feedback.textContent=error.message;}
       finally {get.disabled=false;}
     }),item.downloaded?"":"primary");
+    const useLocal=item.localSkill?btn("复制本机使用指令",run(()=>copy(`使用已安装的 ${item.id}。先读取这个本机 Skill 入口和它引用的文件：\n${item.localSkill.path}\n根据我接下来提供的任务执行。`)),"primary"):null;
     const save=item.downloaded?e("a",{cls:"action",href:`/api/market/${item.id}/asset`,download:""},"导出资源文件"):null;
     const use=item.downloaded && item.type==="bgm"?btn("加入知识图谱",run(async()=>{
       await post(`/api/market/${item.id}/use`,{});location.hash="#graph";
     }),"primary"):null;
     return e("article",{cls:"card market-card"},e("div",{cls:"market-card-head"},sticker(item.type==="skill"?"ready":"listen"),
       e("div",{},e("small",{cls:"muted"},(item.type==="skill"?"Skill":"BGM 标签")+" · 免费"),e("h2",{},item.name),
-        e("p",{cls:"muted"},item.author+" · "+item.version))),e("p",{},item.description),
-      e("p",{cls:"muted"},item.downloaded?(item.type==="skill"?"已下载 · 导出 ZIP 后可交给 Agent 使用":"已下载 · 可加入本机图谱"):"尚未下载"),
-      e("div",{cls:"row"},get,save,use));
+        e("p",{cls:"muted"},item.author+" · "+(item.localSkill?"本机版本":item.version)))),e("p",{},item.description),
+      e("p",{cls:"muted"},item.localSkill?"已连接本机 · 使用当前已安装的 Skill":item.downloaded?(item.type==="skill"?"已下载 · 导出 ZIP 后可交给 Agent 使用":"已下载 · 可加入本机图谱"):"尚未下载"),
+      e("div",{cls:"row"},useLocal,get,save,use));
   }));
   redraw();
-  return [home("Skill 商城","按需下载视频工作流和 BGM 标签。社区资源可以提交 PR 参与上架。"),
+  return [home("Skill 商城","已安装的 Skill 自动连接。其余视频工作流和 BGM 标签按需下载。"),
     e("div",{cls:"row market-actions"},...[["all","全部"],["skill","Skills"],["bgm","BGM 打标库"]].map(([value,label])=>btn(label,()=>{filter=value;redraw();})),
       btn("刷新社区",run(async event=>{
         const button=event.currentTarget;

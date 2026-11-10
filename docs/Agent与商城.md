@@ -22,7 +22,7 @@
 
 ## Skill 商城
 
-桌面端随包只携带四条官方资源的目录信息。下载动作才从公开 GitHub 获取制品，核对 SHA-256 后写入本机 `market-downloads`。Skill ZIP 可导出后检查，再按所用 Agent 的方式安装。BGM 仅含标签和用法备注，需另备有权使用的音源，下载后手动加入图谱。
+桌面端随包只携带四条官方资源的目录信息。进入商城时核对本机官方 Skill 的 `SKILL.md`，从 `CODEX_HOME/skills`、`~/.codex/skills` 和 `~/.agents/skills` 识别同名入口。已连接的卡片直接复制本机使用指令。下载动作才从公开 GitHub 获取制品，核对 SHA-256 后写入本机 `market-downloads`。Skill ZIP 可导出后检查，再按所用 Agent 的方式安装。BGM 仅含标签和用法备注，需另备有权使用的音源，下载后手动加入图谱。
 
 社区 [资源目录](https://github.com/lyzbcy/laoyu-video-studio-marketplace) 支持 Skill ZIP 和 BGM 标签 JSONL。贡献者在「上架免费资源」填写元数据、选择本地制品计算 SHA-256、导出条目或复制投稿指令。制品由贡献者发布到公开 GitHub，目录条目通过 Fork 与 PR 审核，合并后点击「刷新社区」即可看到。程序本身不会上传本地文件。
 

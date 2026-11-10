@@ -20,11 +20,12 @@ export function libraryRows(input) {
       Array.isArray(values) ? values.slice(0, 24).map(value => ({ group: text(group, 60), label: text(value, 60) })) : [])
       .filter(tag => tag.group && tag.label);
     const note = text(row.note, 1200);
-    const hint=row.titleHint?.source==="jianying-draft"?text(row.titleHint.value,120):"";
+    const hint=["jianying-draft","jianying-catalog"].includes(row.titleHint?.source)?text(row.titleHint.value,120):"";
     if (!tags.length && !note && !hint) continue;
     const id = hash(source).slice(0, 24);
     tracks.set(id, { id, title:hint||title, kind: row.kind, duration: Number.isFinite(row.duration) ? row.duration : null, tags, note,
-      ...(hint?{titleHint:{value:hint,source:"jianying-draft",weight:0.35}}:{}) });
+      ...(hint?{titleHint:{value:hint,source:row.titleHint.source,weight:0.35}}:{}),
+      ...(typeof row.available==="boolean"?{available:row.available}:{}) });
   }
   return [...tracks.values()].sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -35,7 +36,7 @@ export function sourceGraph(sources, prior) {
     return rank(a)-rank(b)||a.localeCompare(b);
   }).flatMap(key => sources[key]);
   const tracks = [...new Map(rows.map(track => [track.id, track])).values()].sort((a,b)=>a.id.localeCompare(b.id));
-  const revision = hash(JSON.stringify(tracks));
+  const revision = hash(JSON.stringify(tracks.map(({available,...evidence})=>evidence)));
   const tags = new Map();
   for (const track of tracks) for (const tag of track.tags) {
     const key = tag.group + " / " + tag.label;

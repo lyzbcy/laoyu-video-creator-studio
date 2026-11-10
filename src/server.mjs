@@ -184,7 +184,7 @@ fs.mkdirSync(projects,{recursive:true});
 process.env.LAOYU_STUDIO_DATA=data;
 const tagger=createRequire(import.meta.url)("./tagger/sync-server.js");
 export function startStudio({port=Number(process.env.LAOYU_STUDIO_PORT || 18765), desktopKey, webhook, feedbackFetcher, marketFetcher}={}) {
-  const market=createMarketplace(data,official,{fetcher:marketFetcher});
+  const market=createMarketplace(data,official,{fetcher:marketFetcher,...(desktopKey?{}:{skillRoots:[]})});
   const diagnostics=createDiagnostics(data);
   const feedback=createFeedback({version,webhook,readLogs:diagnostics.recent,fetcher:feedbackFetcher});
 const server=http.createServer(async(req,res)=>{

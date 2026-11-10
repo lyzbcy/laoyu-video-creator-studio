@@ -3385,8 +3385,8 @@ $("helpBody").addEventListener("click", e => {
 /* ── AI 选曲：把"音乐清单 + 剧情"打包成提示词，交给任意 AI 挑歌 ── */
 function titleHint(track) {
   const meta=track?.meta;
-  return meta?.titleSource==="jianying-draft" && meta.title
-    ? {value:meta.title,source:"jianying-draft",weight:0.35} : null;
+  return ["jianying-draft","jianying-catalog"].includes(meta?.titleSource) && meta.title
+    ? {value:meta.title,source:meta.titleSource,weight:0.35} : null;
 }
 function exportableRecords() {
   return state.order.flatMap(id=>{
@@ -3624,8 +3624,8 @@ log("info", "启动", `捞鱼打标工具启动 · 恢复 ${restored ? state.ord
 if (window.top !== window) window.addEventListener("message", event => {
   if (event.source !== parent || event.origin !== location.origin || event.data?.type !== "studio-graph-source") return;
   const rows=exportableRecords().map(row=>{
-    const hint=titleHint(state.tracks[row.id]);
-    return hint?{...row,titleHint:hint}:row;
+    const track=state.tracks[row.id],hint=titleHint(track);
+    return {...row,available:trackAlive(track),...(hint?{titleHint:hint}:{})};
   });
   parent.postMessage({type:"studio-graph-source-result",id:event.data.id,rows},location.origin);
 });
