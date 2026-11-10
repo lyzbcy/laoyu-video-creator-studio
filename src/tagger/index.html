@@ -1027,7 +1027,7 @@ const NOTE_SYNONYMS = {
 const state = {
   groups: JSON.parse(JSON.stringify(DEFAULT_GROUPS)),
   tracks: {},        // id -> {id, file, kind, fmt, size, duration?, url?, _file?, decodeFail?}
-  legacyBaseline: {}, legacyGroups: {},
+  legacyBaseline: {}, legacyGroups: {}, desktopGroupsDirty: false, desktopGroupsBase: null,
   records: {},       // id -> {id, file, kind, duration, tags, note?, labeled_at, updated_at}
   order: [],
   current: null,
@@ -1197,7 +1197,8 @@ function snapshot() {
     tracks[id] = { id: t.id, file: t.file, displayName: t.displayName || null, kind: t.kind, kindSource: t.kindSource || null, waveChecked: t.waveChecked || false, decodeFail: t.decodeFail || false, fmt: t.fmt, size: t.size, duration: t.duration };
   }
   return { groups: state.groups, tracks, records: state.records, order: state.order, current: state.current, blocklist: state.blocklist || [],
-    legacyBaseline:state.legacyBaseline,legacyGroups:state.legacyGroups };
+    legacyBaseline:state.legacyBaseline,legacyGroups:state.legacyGroups,
+    desktopGroupsDirty:state.desktopGroupsDirty,desktopGroupsBase:state.desktopGroupsBase };
 }
 
 function saveLocal() {
@@ -1218,6 +1219,8 @@ function loadLocal() {
     state.records = s.records || {};
     state.legacyBaseline = s.legacyBaseline || {};
     state.legacyGroups = s.legacyGroups || {};
+    state.desktopGroupsDirty = s.desktopGroupsDirty === true;
+    state.desktopGroupsBase = s.desktopGroupsBase || null;
     state.order = s.order || Object.keys(state.tracks);
     state.current = s.current || null;
     state.blocklist = Array.isArray(s.blocklist) ? s.blocklist : [];
@@ -1235,8 +1238,60 @@ function buildJSONLText() {
   return lines.join("\n") + "\n";
 }
 
+let desktopSave = Promise.resolve(), desktopToken;
+async function saveDesktopDatabase(reason) {
+  const changes = [];
+  const saved = new Map();
+  for (const id of new Set([...Object.keys(state.records),...Object.keys(state.legacyBaseline)])) {
+    const record = state.records[id] || null;
+    const value = JSON.stringify(record);
+    const before = state.legacyBaseline[id] || "null";
+    if (value === before) continue;
+    changes.push({id,before:JSON.parse(before),record:JSON.parse(value)});
+    saved.set(id,value);
+  }
+  const groups = state.desktopGroupsDirty && state.desktopGroupsBase
+    ? {before:state.desktopGroupsBase,after:JSON.parse(JSON.stringify(state.groups))} : null;
+  if (!changes.length && !groups) return;
+  try {
+    if (!state._desktopDb.online) throw new Error("旧数据库暂时无法读取，修改已留在本机。");
+    if (!desktopToken) {
+      const session = await fetch("/api/projects");
+      desktopToken = (await session.json()).token;
+    }
+    const response = await fetch("/api/bgm/database", {method:"POST",headers:{"Content-Type":"application/json","X-Board-Token":desktopToken},
+      body:JSON.stringify({changes,groups})});
+    const result = await response.json();
+    if (!response.ok) {
+      if (response.status===403) desktopToken=null;
+      throw new Error(result.error || "数据库保存失败，修改已留在本机。");
+    }
+    for (const {id,record} of result.records) {
+      if (record) state.legacyBaseline[id]=JSON.stringify(record);
+      else delete state.legacyBaseline[id];
+      if (JSON.stringify(state.records[id] || null)!==saved.get(id)) continue;
+      if (record) state.records[id]=record;
+      else delete state.records[id];
+    }
+    state.desktopGroupsBase=result.groups;
+    if (groups && JSON.stringify(groups.after)===JSON.stringify(state.groups)) state.desktopGroupsDirty=false;
+    state._desktopDb.error=null;
+    saveLocal();
+    log("ok","写库",`${reason || "保存"} · ${changes.length} 条已更新`);
+  } catch(error) {
+    state._desktopDb.error=error.message;
+    log("err","写库",error.message);
+    toast(error.message,true);
+  }
+  updateDbStatus();
+}
+
 async function saveDB(reason) {
   saveLocal();
+  if (!state.handle && state._desktopDb) {
+    desktopSave=desktopSave.then(()=>saveDesktopDatabase(reason));
+    return desktopSave;
+  }
   if (!state.handle) return;
   try {
     const w = await state.handle.createWritable();
@@ -1253,9 +1308,10 @@ async function saveDB(reason) {
 
 let saveTimer = null;
 function scheduleSave(reason) {
+  if (state._desktopDb && ["加标签","加组","删组"].includes(reason)) state.desktopGroupsDirty=true;
   saveLocal();
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveDB(reason), 800);
+  saveTimer = setTimeout(() => {saveTimer=null;void saveDB(reason);}, 800);
 }
 
 function importJSONLText(text, silent, fromExternal) {
@@ -1291,6 +1347,11 @@ function updateDbStatus() {
   if (state.handle) {
     el.className = "ok";
     el.textContent = "✓ " + state.handle.name + " · 自动保存已连接";
+  } else if (state._desktopDb) {
+    const {name,online,error}=state._desktopDb;
+    el.className=online&&!error?"ok":"warn";
+    el.textContent=online&&!error ? "✓ "+name+" · 自动保存已连接" : "数据库保存待处理 · 修改保留在本机";
+    el.title=error||"";
   } else {
     el.className = "warn";
     el.textContent = "未绑定 — 数据只存浏览器本地";
@@ -2078,10 +2139,11 @@ function commitNote() {
 }
 $("noteBox").addEventListener("input", () => {
   clearTimeout(noteSaveTimer);
-  noteSaveTimer = setTimeout(commitNote, 600); // 打字停顿即存，不等失焦
+  noteSaveTimer = setTimeout(() => {noteSaveTimer=null;commitNote();}, 600); // 打字停顿即存，不等失焦
 });
 $("noteBox").addEventListener("change", () => {
   clearTimeout(noteSaveTimer);
+  noteSaveTimer=null;
   commitNote();
 });
 
@@ -2931,6 +2993,11 @@ async function syncFromServer(first, forceChoose = false) {
     legacyStatus.hidden = !legacy;
     if (legacy?.unavailable) legacyStatus.textContent = "旧标签库暂时无法读取 · 已保留本机标签";
     const labelsChanged = legacy?.records ? mergeLegacyTags(state, legacy) : false;
+    if (legacy?.managed) {
+      state._desktopDb={name:legacy.name||state._desktopDb?.name||"bgm_library.jsonl",online:!legacy.unavailable,error:state._desktopDb?.error};
+      if (legacy.groups && !state.desktopGroupsDirty) state.desktopGroupsBase=legacy.groups;
+    }
+    updateDbStatus();
     // 多缓存位置：自动同步 = 发现的全部有音频位置都同步（发现即同步，新目录自动进来，
     // 绝不因记忆失效卡死或漏目录）；只有用户主动点「一键同步」才弹选择框做过滤，
     // 选择结果只作为下次弹窗的预勾选。曾因 remembered 过滤把同步挂死/漏新目录，整库 💤。
@@ -3026,7 +3093,7 @@ async function syncFromServer(first, forceChoose = false) {
     if (legacy?.records) {
       const labeled = legacy.records.filter(item=>!item.excluded && isLabeled(item.id));
       const available = labeled.filter(item=>state.tracks[item.id]?.url || state.tracks[item.id]?._file).length;
-      legacyStatus.textContent = `旧标签库（只读） · ${labeled.length} 条已打标 · ${available} 条有音源`;
+      legacyStatus.textContent = `旧标签库${legacy.managed?"":"（只读）"} · ${labeled.length} 条已打标 · ${available} 条有音源`;
     }
     if (first) {
       log("info", "服务器模式", `载入 ${added} 首` + (kindFixed ? `，按时长自动分类 ${kindFixed} 首` : "") + (rebinded ? `，认回导出包文件 ${rebinded} 首` : "") + (pruned ? `，清掉幽灵条目 ${pruned} 个` : ""));
@@ -3135,7 +3202,7 @@ const LS_KEY_ONBOARD = "laoyu_tagger_onboard_v1";
 /* ── 新手向导：第一次打开自动播放，帮助中心里随时重看 ── */
 let obStep = 0;
 function obSteps() {
-  const bound = !!state.handle;
+  const bound = !!(state.handle || state._desktopDb?.online);
   return [
     {
       title: "嗨，我是捞鱼！", sub: "WELCOME · 30 秒带你上路", sticker: "happy.png",
@@ -3491,6 +3558,19 @@ $("btnSendToStudio").addEventListener("click", async () => {
     audio.pause();
   } catch { toast("无法读取这首音乐，请重新链接音频目录", true, "hmm.png"); }
 });
+window.flushStudioBgm = async () => {
+  if (noteSaveTimer) {
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer=null;
+    commitNote();
+  }
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer=null;
+    await saveDB("离开打标页");
+  }
+  await desktopSave;
+};
 const serverParam = new URLSearchParams(location.search).get("server");
 if (serverParam) {
   restoredHandle.then(() => loadFromServer(serverParam));

@@ -60,4 +60,21 @@ test("desktop manifest exposes existing labels and only their matching legacy au
   assert.equal((await get("/music/"+encodeURIComponent("私人素材.wav"))).status,404);
   assert.equal((await fetch(app.origin+"/manifest.json")).status,403);
   assert.equal(await fs.readFile(file,"utf8"),"\uFEFF"+input);
+  const {token}=await (await get("/api/projects")).json();
+  const save=changes=>fetch(app.origin+"/api/bgm/database",{method:"POST",headers:{
+    "x-studio-desktop":"test-key","x-board-token":token,Origin:app.origin,"Content-Type":"application/json",
+  },body:JSON.stringify({changes})});
+  const before=manifest.legacy.records[0];
+  assert.equal((await save([{id,before,record:{...before,note:"写入测试"}}])).status,403);
+  await fs.writeFile(path.join(data,"legacy-bgm.json"),JSON.stringify({library:file,audioDirs:[audio],writeEnabled:true}));
+  const saved=await save([{id,before,record:{...before,note:"写入测试"}}]);
+  assert.equal(saved.status,200);
+  assert.equal((await saved.json()).records[0].record.note,"写入测试");
+  assert.equal(await fs.readFile(path.join(data,"legacy-bgm.previous.jsonl"),"utf8"),"\uFEFF"+input);
+  const refreshed=await (await get("/manifest.json")).json();
+  assert.equal(refreshed.legacy.managed,true);
+  assert.equal(refreshed.legacy.records[0].note,"写入测试");
+  const committed=await fs.readFile(file,"utf8");
+  assert.equal((await save([{id,before,record:{...before,note:"过期覆盖"}}])).status,409);
+  assert.equal(await fs.readFile(file,"utf8"),committed);
 });

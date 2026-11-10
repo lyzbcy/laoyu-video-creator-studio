@@ -290,6 +290,10 @@ async function updateRoute() {
   const number=++routeSerial;
   const name=location.hash.slice(1)||"home";
   const match=/^project\/([a-f0-9]{32})\/(board|timeline|review)$/.exec(name);
+  if(current?.library&&!['library','tools'].includes(name)) {
+    await current.library.contentWindow.flushStudioBgm?.();
+    if(number!==routeSerial) return;
+  }
   if(current?.board&&!current.board.hidden && (!match||match[1]!==current.id||match[2]!=="board")) {
     try { await current.board.contentWindow.flushStudioBoard?.();current.board.contentWindow.postMessage("studio-hide",location.origin); }
     catch(error){ notify(error.message);history.replaceState(null,"",projectLink(current.id,"board"));return; }
@@ -389,6 +393,7 @@ window.addEventListener("message",run(async event=>{
 }));
 window.addEventListener("hashchange",run(updateRoute));
 window.flushStudioWindow = async () => {
+  if (current?.library) await current.library.contentWindow.flushStudioBgm?.();
   if (current?.board && !current.board.hidden) await current.board.contentWindow.flushStudioBoard?.();
   if (current?.editor?.isSaving()) await current.editor.flush();
 };

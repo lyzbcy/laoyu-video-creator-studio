@@ -1,7 +1,7 @@
 {
   "name": "laoyu-creator-studio",
   "productName": "捞鱼视频创作台",
-  "version": "0.1.4-dev",
+  "version": "0.1.5-dev",
   "private": true,
   "main": "src/desktop.mjs",
   "devDependencies": { "electron": "45.0.0" }

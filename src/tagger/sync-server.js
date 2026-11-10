@@ -5,7 +5,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
-const { readLegacyLibrary } = require("./legacy-source.js");
+const { readLegacyLibrary, saveLegacyDatabase } = require("./legacy-source.js");
 
 const TOOL_DIR = __dirname;
 const DATA_DIR = process.env.LAOYU_STUDIO_DATA;
@@ -636,6 +636,13 @@ async function handleRemoveDir(req, res) {
   }
 }
 
+function saveDatabase(input) {
+  const result=saveLegacyDatabase(DATA_DIR,input);
+  legacyAt=0;
+  manifestAt=0;
+  return result;
+}
+
 module.exports = function handleTagger(req, res, pathname) {
   try {
     let filePath = null;
@@ -707,3 +714,5 @@ module.exports = function handleTagger(req, res, pathname) {
     res.writeHead(500); res.end(e.message);
   }
 };
+
+module.exports.saveDatabase = saveDatabase;
