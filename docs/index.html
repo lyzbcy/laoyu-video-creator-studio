@@ -199,7 +199,7 @@
       <p style="color:var(--ink-soft); font-size:14px">
         工具打开时自动对比本地与发布页的版本号，有更新就在顶部弹出提醒条。
         点「一键更新」，工具会让本地服务自动下载最新版并完成替换（你的标签数据、备注一律保留），更新完刷新页面即可。
-        网络不好或想手动来，也可以点「打开发布页」重新下载覆盖。版本记录见 <a href="https://github.com/lyzbcy/laoyu-tagger/releases" style="color:var(--tang)">Releases</a>。
+        网络不好或想手动来，也可以点「打开发布页」重新下载覆盖。版本记录见 <a href="https://github.com/lyzbcy/laoyu-video-creator-studio/releases" style="color:var(--tang)">Releases</a>。
       </p>
     </div>
   </div>
@@ -208,7 +208,7 @@
 <footer>
   <a href="about.html" title="认识一下捞鱼"><img src="assets/stickers/laoyu.png" alt="捞鱼"></a>
   <p><a href="about.html" style="color:var(--ink-soft)">捞鱼打标工具 · 由一个弱小但有梦想的开发者维护</a></p>
-  <p><a href="https://github.com/lyzbcy/laoyu-tagger">GitHub 仓库</a> · <a href="about.html">关于作者</a> · 表情来自星星布丁精选 · 数据永远在你自己电脑里</p>
+  <p><a href="https://github.com/lyzbcy/laoyu-video-creator-studio">GitHub 仓库</a> · <a href="about.html">关于作者</a> · 表情来自星星布丁精选 · 数据永远在你自己电脑里</p>
 </footer>
 
 <script>
@@ -222,8 +222,8 @@ fetch("version.json", { cache: "no-store" })
     document.title = `捞鱼打标工具 v${v.version} — BGM/音效边听边打标小铺`;
   })
   .catch(() => {});
-// 下载按钮：仓库源码 zip
-const ZIP = "https://github.com/lyzbcy/laoyu-tagger/archive/refs/heads/main.zip";
+// 下载按钮：v2.14.2 发行包 zip（main 分支已是捞鱼视频创作台源码）
+const ZIP = "https://github.com/lyzbcy/laoyu-video-creator-studio/releases/download/v2.14.2/laoyu-tagger-v2.14.2.zip";
 document.getElementById("navDl").href = ZIP;
 document.getElementById("heroDl").href = ZIP;
 // ?dl=1 自动下载

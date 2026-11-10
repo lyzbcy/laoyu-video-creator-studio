@@ -719,7 +719,7 @@
 <div id="updateBanner" style="display:none; padding:9px 16px; background:var(--tang-soft); border-bottom:2px solid var(--tang); font-size:13px; color:#8a3a1e; align-items:center; gap:10px; flex-shrink:0; flex-wrap:wrap;">
   <span id="updateText">🆕 发现新版本</span>
   <button class="btn primary small bouncy" id="btnUpdateNow">一键更新</button>
-  <a class="btn small bouncy" id="btnUpdatePage" href="https://lyzbcy.github.io/laoyu-tagger/" target="_blank" style="text-decoration:none">打开发布页</a>
+  <a class="btn small bouncy" id="btnUpdatePage" href="https://lyzbcy.github.io/laoyu-video-creator-studio/" target="_blank" style="text-decoration:none">打开发布页</a>
   <button class="btn small bouncy" id="btnUpdateIgnore">忽略此版本</button>
 </div>
 
@@ -993,7 +993,7 @@ const LS_KEY_SKIPVER = "laoyu_tagger_skipver";
 const STICKERS = ["happy","hmm","cheer","sleepy","sad","love","wave","salute","proud","tehe","thanks","wah","laoyu"];
 
 const APP_VERSION = "2.14.2";
-const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-tagger/version.json";
+const RELEASE_VERSION_URL = "https://lyzbcy.github.io/laoyu-video-creator-studio/version.json";
 
 const DEFAULT_GROUPS = [
   { name: "情绪", tags: ["紧张","悬疑","压抑","愤怒","悲伤","燃","温馨","欢快","空灵","史诗","孤独","甜","戏谑","庄严"] },
@@ -1113,7 +1113,7 @@ function nowISO() { return new Date().toISOString(); }
 
 function showFbFallback(text, contact) {
   // 机器人通道没通时的兜底：把内容预填到 GitHub Issue，同事点 Submit 即可
-  $("fbGhLink").href = "https://github.com/lyzbcy/laoyu-tagger/issues/new" +
+  $("fbGhLink").href = "https://github.com/lyzbcy/laoyu-video-creator-studio/issues/new" +
     "?title=" + encodeURIComponent("[工具反馈] " + text.slice(0, 30)) +
     "&body=" + encodeURIComponent(text + (contact ? "\n\n联系方式：" + contact : "") + "\n\n—— 来自捞鱼打标工具 v" + APP_VERSION);
   $("fbFallback").style.display = "";
@@ -3163,7 +3163,7 @@ $("btnUpdateNow").addEventListener("click", async () => {
   if (!state._serverMode) {
     // 纯浏览器模式没有本地服务，无法自替换，引导去发布页
     toast("浏览器直开模式不支持自动更新，已打开发布页", false, "sad.png");
-    window.open("https://lyzbcy.github.io/laoyu-tagger/?dl=1", "_blank");
+    window.open("https://lyzbcy.github.io/laoyu-video-creator-studio/?dl=1", "_blank");
     return;
   }
   btn.disabled = true;
@@ -3184,7 +3184,7 @@ $("btnUpdateNow").addEventListener("click", async () => {
             try { await fetch("/manifest.json", { cache: "no-store" }); location.reload(); return; } catch (e) {}
           }
           toast("服务器等半天没起来：双击「启动打标工具.bat」手动启动，或去发布页重新下载", true);
-          window.open("https://lyzbcy.github.io/laoyu-tagger/?dl=1", "_blank");
+          window.open("https://lyzbcy.github.io/laoyu-video-creator-studio/?dl=1", "_blank");
         };
         waitUp();
       } else {
